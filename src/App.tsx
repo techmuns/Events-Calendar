@@ -15,7 +15,7 @@ import { WidgetCard } from "./components/WidgetCard";
 import { ErrorState, ShimmerRows } from "./components/states";
 
 const DEFAULT_FILTERS: Filters = {
-  universe: "NIFTY500",
+  universe: "ALL",
   types: ["EARNINGS", "CONCALL", "DEMERGER"],
   horizonDays: 90,
   search: "",

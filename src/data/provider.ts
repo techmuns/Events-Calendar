@@ -32,5 +32,17 @@ export const apiProvider: EventsProvider = {
   },
 };
 
-// Active provider. Switch to `apiProvider` once the backend is live.
-export const eventsProvider: EventsProvider = sampleProvider;
+// Active provider: prefer the live NSE feed, fall back to sample data so the
+// dashboard always shows something (e.g. if Cloudflare can't reach NSE).
+export const eventsProvider: EventsProvider = {
+  async getEvents() {
+    try {
+      const live = await apiProvider.getEvents();
+      if (live.live && live.events.length > 0) return live;
+      const sample = await sampleProvider.getEvents();
+      return { ...sample, source: "Sample dataset (live feed returned no rows yet)" };
+    } catch {
+      return sampleProvider.getEvents();
+    }
+  },
+};
