@@ -17,7 +17,13 @@ const COLUMNS: { key: SortKey; label: string }[] = [
   { key: "exchange", label: "Exch." },
 ];
 
-export function DetailTable({ events }: { events: CorporateEvent[] }) {
+export function DetailTable({
+  events,
+  onSelect,
+}: {
+  events: CorporateEvent[];
+  onSelect: (e: CorporateEvent) => void;
+}) {
   const [sort, setSort] = useState<{ key: SortKey; dir: 1 | -1 }>({ key: "date", dir: 1 });
 
   const sorted = useMemo(() => {
@@ -76,7 +82,7 @@ export function DetailTable({ events }: { events: CorporateEvent[] }) {
         </thead>
         <tbody>
           {sorted.map((e) => (
-            <tr key={e.id}>
+            <tr key={e.id} onClick={() => onSelect(e)} style={{ cursor: "pointer" }}>
               <td style={{ ...td, whiteSpace: "nowrap" }}>{formatDate(e.date)}</td>
               <td style={td}>
                 <div style={{ fontWeight: 600, color: tokens.textPrimary }}>{e.company}</div>
@@ -97,6 +103,7 @@ export function DetailTable({ events }: { events: CorporateEvent[] }) {
                     href={e.sourceUrl}
                     target="_blank"
                     rel="noreferrer"
+                    onClick={(ev) => ev.stopPropagation()}
                     style={{ display: "inline-flex", alignItems: "center", gap: 4, color: tokens.primary, textDecoration: "none" }}
                   >
                     Filing <ExternalLinkIcon size={12} />

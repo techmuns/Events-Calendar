@@ -1,6 +1,6 @@
 import { useState } from "react";
 import type { CSSProperties } from "react";
-import type { Filters } from "./types";
+import type { CorporateEvent, Filters } from "./types";
 import { tokens } from "./theme";
 import { useEvents } from "./hooks/useEvents";
 import { useHostContext } from "./hooks/useHostContext";
@@ -14,7 +14,9 @@ import { SourcesWidget } from "./components/SourcesWidget";
 import { WidgetCard } from "./components/WidgetCard";
 import { ErrorState, ShimmerRows } from "./components/states";
 import { Heatmap } from "./components/Heatmap";
+import { EventDrawer } from "./components/EventDrawer";
 import { useTheme } from "./hooks/useTheme";
+import { useWatchlist } from "./hooks/useWatchlist";
 import { CalendarIcon, MoonIcon, RefreshIcon, SunIcon } from "./components/icons";
 
 const DEFAULT_FILTERS: Filters = {
@@ -75,8 +77,10 @@ export default function App() {
   const { result, loading, error, reload } = useEvents();
   const { ticker, tickerCompany } = useHostContext();
   const { isDark, toggle } = useTheme();
+  const watchlist = useWatchlist();
+  const [selected, setSelected] = useState<CorporateEvent | null>(null);
 
-  const filtered = result ? applyFilters(result.events, filters) : [];
+  const filtered = result ? applyFilters(result.events, filters, watchlist.set) : [];
 
   const shell: CSSProperties = {
     display: "flex",
@@ -213,14 +217,19 @@ export default function App() {
             ) : !result ? (
               <ShimmerRows rows={6} />
             ) : view === "agenda" ? (
-              <AgendaView events={filtered} />
+              <AgendaView
+                events={filtered}
+                onSelect={setSelected}
+                isStarred={watchlist.has}
+                onToggleStar={watchlist.toggle}
+              />
             ) : (
-              <MonthView events={filtered} />
+              <MonthView events={filtered} onSelect={setSelected} />
             )}
           </WidgetCard>
 
           <WidgetCard title="All events" subtitle="Sortable — click a column header">
-            {!result ? <ShimmerRows rows={4} /> : <DetailTable events={filtered} />}
+            {!result ? <ShimmerRows rows={4} /> : <DetailTable events={filtered} onSelect={setSelected} />}
           </WidgetCard>
 
           <WidgetCard title="Sources & freshness">
@@ -228,6 +237,15 @@ export default function App() {
           </WidgetCard>
         </div>
       </main>
+
+      <EventDrawer
+        event={selected}
+        allEvents={result?.events ?? []}
+        onClose={() => setSelected(null)}
+        onSelect={setSelected}
+        isStarred={watchlist.has}
+        onToggleStar={watchlist.toggle}
+      />
     </div>
   );
 }

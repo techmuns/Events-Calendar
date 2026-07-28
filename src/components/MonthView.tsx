@@ -12,7 +12,13 @@ import {
   todayStart,
 } from "../lib/dates";
 
-export function MonthView({ events }: { events: CorporateEvent[] }) {
+export function MonthView({
+  events,
+  onSelect,
+}: {
+  events: CorporateEvent[];
+  onSelect: (e: CorporateEvent) => void;
+}) {
   const today = todayStart();
   const [cursor, setCursor] = useState({ year: today.getFullYear(), month: today.getMonth() });
   const [selected, setSelected] = useState<string>(toISO(today));
@@ -149,12 +155,16 @@ export function MonthView({ events }: { events: CorporateEvent[] }) {
         </div>
         <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
           {selectedEvents.map((e) => (
-            <div key={e.id} style={{ display: "flex", alignItems: "center", gap: 10 }}>
+            <button
+              key={e.id}
+              onClick={() => onSelect(e)}
+              style={{ cursor: "pointer", border: "none", background: "transparent", padding: "2px 0", textAlign: "left", display: "flex", alignItems: "center", gap: 10 }}
+            >
               <EventTypeChip type={e.eventType} />
               <span style={{ fontSize: 13, fontWeight: 600, color: tokens.textPrimary }}>{e.company}</span>
               <span style={{ fontSize: 12, color: tokens.textMuted }}>{e.subtype}</span>
               <StatusBadge status={e.status} />
-            </div>
+            </button>
           ))}
         </div>
       </div>

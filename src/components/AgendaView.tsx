@@ -3,11 +3,17 @@ import type { CorporateEvent } from "../types";
 import { tokens } from "../theme";
 import { EventTypeChip, StatusBadge, ExchangePill } from "./badges";
 import { EmptyState } from "./states";
-import { ExternalLinkIcon } from "./icons";
+import { ExternalLinkIcon, StarIcon } from "./icons";
 import { type Bucket, bucketFor, parseISO, todayStart } from "../lib/dates";
 
 const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
 const BUCKET_ORDER: Bucket[] = ["Today", "This week", "Next week", "Later"];
+
+interface RowHandlers {
+  onSelect: (e: CorporateEvent) => void;
+  isStarred: (ticker: string) => boolean;
+  onToggleStar: (ticker: string) => void;
+}
 
 function DateBlock({ iso }: { iso: string }) {
   const d = parseISO(iso);
@@ -33,16 +39,30 @@ function DateBlock({ iso }: { iso: string }) {
   );
 }
 
-function EventRow({ e }: { e: CorporateEvent }) {
+function EventRow({ e, onSelect, isStarred, onToggleStar }: { e: CorporateEvent } & RowHandlers) {
+  const starred = isStarred(e.ticker);
   const row: CSSProperties = {
     display: "flex",
     alignItems: "center",
     gap: 14,
     padding: "10px 16px",
     borderBottom: `1px solid ${tokens.border}`,
+    cursor: "pointer",
+  };
+  const stop = (fn: () => void) => (ev: { stopPropagation: () => void }) => {
+    ev.stopPropagation();
+    fn();
   };
   return (
-    <div style={row}>
+    <div style={row} onClick={() => onSelect(e)}>
+      <button
+        onClick={stop(() => onToggleStar(e.ticker))}
+        aria-label={starred ? "Remove from watchlist" : "Add to watchlist"}
+        title={starred ? "In watchlist" : "Add to watchlist"}
+        style={{ cursor: "pointer", border: "none", background: "transparent", padding: 2, color: starred ? "#f59e0b" : tokens.textHint, display: "inline-flex", flexShrink: 0 }}
+      >
+        <StarIcon size={16} filled={starred} />
+      </button>
       <DateBlock iso={e.date} />
       <div style={{ flex: 1, minWidth: 0 }}>
         <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
@@ -63,6 +83,7 @@ function EventRow({ e }: { e: CorporateEvent }) {
             target="_blank"
             rel="noreferrer"
             title="View filing"
+            onClick={(ev) => ev.stopPropagation()}
             style={{ display: "inline-flex", color: tokens.primary, padding: "0 4px" }}
           >
             <ExternalLinkIcon size={14} />
@@ -73,17 +94,12 @@ function EventRow({ e }: { e: CorporateEvent }) {
   );
 }
 
-export function AgendaView({ events }: { events: CorporateEvent[] }) {
+export function AgendaView({ events, ...handlers }: { events: CorporateEvent[] } & RowHandlers) {
   if (events.length === 0) {
     return <EmptyState message="No events match these filters" hint="Try widening the horizon or switching the universe to All." />;
   }
   const today = todayStart();
-  const groups: Record<Bucket, CorporateEvent[]> = {
-    Today: [],
-    "This week": [],
-    "Next week": [],
-    Later: [],
-  };
+  const groups: Record<Bucket, CorporateEvent[]> = { Today: [], "This week": [], "Next week": [], Later: [] };
   for (const e of events) groups[bucketFor(e.date, today)].push(e);
 
   return (
@@ -110,7 +126,7 @@ export function AgendaView({ events }: { events: CorporateEvent[] }) {
             <span style={{ color: tokens.textHint, fontWeight: 600 }}> · {groups[b].length}</span>
           </div>
           {groups[b].map((e) => (
-            <EventRow key={e.id} e={e} />
+            <EventRow key={e.id} e={e} {...handlers} />
           ))}
         </div>
       ))}
