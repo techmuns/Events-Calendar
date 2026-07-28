@@ -3,6 +3,7 @@ import type { CSSProperties } from "react";
 import type { CorporateEvent } from "../types";
 import { tokens } from "../theme";
 import { EventTypeChip, StatusBadge } from "./badges";
+import { ExternalLinkIcon } from "./icons";
 import { formatDate } from "../lib/dates";
 import { EmptyState } from "./states";
 
@@ -92,8 +93,13 @@ export function DetailTable({ events }: { events: CorporateEvent[] }) {
               <td style={{ ...td, color: tokens.textMuted }}>{e.exchange}</td>
               <td style={td}>
                 {e.sourceUrl ? (
-                  <a href={e.sourceUrl} target="_blank" rel="noreferrer" style={{ color: tokens.primary, textDecoration: "none" }}>
-                    Filing ↗
+                  <a
+                    href={e.sourceUrl}
+                    target="_blank"
+                    rel="noreferrer"
+                    style={{ display: "inline-flex", alignItems: "center", gap: 4, color: tokens.primary, textDecoration: "none" }}
+                  >
+                    Filing <ExternalLinkIcon size={12} />
                   </a>
                 ) : (
                   "—"

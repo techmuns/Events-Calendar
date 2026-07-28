@@ -3,6 +3,7 @@ import type { CorporateEvent } from "../types";
 import { tokens } from "../theme";
 import { EventTypeChip, StatusBadge, ExchangePill } from "./badges";
 import { EmptyState } from "./states";
+import { ExternalLinkIcon } from "./icons";
 import { type Bucket, bucketFor, parseISO, todayStart } from "../lib/dates";
 
 const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
@@ -18,7 +19,7 @@ function DateBlock({ iso }: { iso: string }) {
         textAlign: "center",
         borderRadius: 10,
         border: `1px solid ${tokens.border}`,
-        background: "#ffffff",
+        background: tokens.surface,
         padding: "6px 0",
       }}
     >
@@ -49,8 +50,7 @@ function EventRow({ e }: { e: CorporateEvent }) {
           <span style={{ fontSize: 12, color: tokens.textHint }}>{e.ticker}</span>
         </div>
         <div style={{ fontSize: 12.5, color: tokens.textMuted, marginTop: 2 }}>
-          {e.subtype}
-          {e.time ? ` · ${e.time}` : ""} · {e.sector}
+          {[e.subtype, e.time, e.sector].filter(Boolean).join(" · ")}
         </div>
       </div>
       <div style={{ display: "flex", alignItems: "center", gap: 6, flexShrink: 0 }}>
@@ -63,9 +63,9 @@ function EventRow({ e }: { e: CorporateEvent }) {
             target="_blank"
             rel="noreferrer"
             title="View filing"
-            style={{ fontSize: 13, textDecoration: "none", color: tokens.primary, padding: "0 4px" }}
+            style={{ display: "inline-flex", color: tokens.primary, padding: "0 4px" }}
           >
-            ↗
+            <ExternalLinkIcon size={14} />
           </a>
         )}
       </div>
@@ -96,7 +96,7 @@ export function AgendaView({ events }: { events: CorporateEvent[] }) {
               top: 0,
               zIndex: 1,
               padding: "8px 16px",
-              background: "rgba(238,242,255,0.75)",
+              background: tokens.bucketBg,
               backdropFilter: "blur(6px)",
               fontSize: 11,
               fontWeight: 700,

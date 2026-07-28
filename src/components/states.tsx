@@ -1,5 +1,6 @@
 import type { ReactNode } from "react";
 import { tokens } from "../theme";
+import { AlertIcon, InboxIcon } from "./icons";
 
 export function ShimmerRows({ rows = 4 }: { rows?: number }) {
   return (
@@ -28,7 +29,7 @@ function Centered({ children, minHeight = 180 }: { children: ReactNode; minHeigh
         justifyContent: "center",
         textAlign: "center",
         padding: 24,
-        gap: 6,
+        gap: 8,
       }}
     >
       {children}
@@ -36,12 +37,12 @@ function Centered({ children, minHeight = 180 }: { children: ReactNode; minHeigh
   );
 }
 
-export function EmptyState({ message, hint, icon = "📭" }: { message: string; hint?: string; icon?: string }) {
+export function EmptyState({ message, hint }: { message: string; hint?: string }) {
   return (
     <Centered>
-      <div style={{ fontSize: 26 }} aria-hidden>
-        {icon}
-      </div>
+      <span style={{ color: tokens.textHint }}>
+        <InboxIcon size={28} />
+      </span>
       <div style={{ fontSize: 14, fontWeight: 600, color: tokens.textSecondary }}>{message}</div>
       {hint && <div style={{ fontSize: 12.5, color: tokens.textHint, maxWidth: 320 }}>{hint}</div>}
     </Centered>
@@ -57,14 +58,13 @@ export function ErrorState({ message }: { message: string }) {
           height: 40,
           borderRadius: 10,
           background: tokens.errorBg,
+          color: tokens.errorRed,
           display: "flex",
           alignItems: "center",
           justifyContent: "center",
-          fontSize: 20,
         }}
-        aria-hidden
       >
-        ⚠️
+        <AlertIcon size={20} />
       </div>
       <div style={{ fontSize: 14, fontWeight: 600, color: tokens.errorRed }}>{message}</div>
       <div style={{ fontSize: 12.5, color: tokens.textHint }}>Please try again in a moment.</div>

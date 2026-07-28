@@ -1,3 +1,82 @@
+:root {
+  --page-bg: linear-gradient(to bottom, rgba(249, 250, 251, 0.8), #ffffff);
+  --surface: #ffffff;
+  --surface-2: #f3f4f6;
+  --card-bg: rgba(255, 255, 255, 0.9);
+  --card-header-bg: rgba(255, 255, 255, 0.95);
+  --card-body-bg: rgba(249, 250, 251, 0.5);
+  --border: rgba(229, 231, 235, 0.8);
+  --border-solid: #e5e7eb;
+  --text-primary: #111827;
+  --text-secondary: #374151;
+  --text-muted: #6b7280;
+  --text-hint: #9ca3af;
+  --primary: #4f46e5;
+  --primary-light: #eef2ff;
+  --primary-border: #e0e7ff;
+  --primary-text: #4338ca;
+  --bucket-bg: rgba(238, 242, 255, 0.75);
+  --error-red: #ef4444;
+  --error-bg: #fef2f2;
+  --shimmer-base: #e5e7eb;
+  --shimmer-mid: #f3f4f6;
+  --scrollbar: #d1d5db;
+}
+
+/* Dark theme — applied explicitly via [data-theme="dark"], or by system
+   preference unless the user has explicitly chosen light. */
+:root[data-theme="dark"] {
+  --page-bg: linear-gradient(to bottom, #0b0f17, #0e131d);
+  --surface: #1a2233;
+  --surface-2: #232d40;
+  --card-bg: rgba(26, 34, 51, 0.82);
+  --card-header-bg: rgba(26, 34, 51, 0.95);
+  --card-body-bg: rgba(15, 20, 31, 0.5);
+  --border: rgba(148, 163, 184, 0.16);
+  --border-solid: #2a3547;
+  --text-primary: #e6eaf2;
+  --text-secondary: #c3cbd9;
+  --text-muted: #93a0b5;
+  --text-hint: #6b7890;
+  --primary: #818cf8;
+  --primary-light: rgba(99, 102, 241, 0.16);
+  --primary-border: rgba(129, 140, 248, 0.32);
+  --primary-text: #a5b4fc;
+  --bucket-bg: rgba(99, 102, 241, 0.14);
+  --error-red: #f87171;
+  --error-bg: rgba(239, 68, 68, 0.12);
+  --shimmer-base: #232d40;
+  --shimmer-mid: #2c3852;
+  --scrollbar: #384457;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --page-bg: linear-gradient(to bottom, #0b0f17, #0e131d);
+    --surface: #1a2233;
+    --surface-2: #232d40;
+    --card-bg: rgba(26, 34, 51, 0.82);
+    --card-header-bg: rgba(26, 34, 51, 0.95);
+    --card-body-bg: rgba(15, 20, 31, 0.5);
+    --border: rgba(148, 163, 184, 0.16);
+    --border-solid: #2a3547;
+    --text-primary: #e6eaf2;
+    --text-secondary: #c3cbd9;
+    --text-muted: #93a0b5;
+    --text-hint: #6b7890;
+    --primary: #818cf8;
+    --primary-light: rgba(99, 102, 241, 0.16);
+    --primary-border: rgba(129, 140, 248, 0.32);
+    --primary-text: #a5b4fc;
+    --bucket-bg: rgba(99, 102, 241, 0.14);
+    --error-red: #f87171;
+    --error-bg: rgba(239, 68, 68, 0.12);
+    --shimmer-base: #232d40;
+    --shimmer-mid: #2c3852;
+    --scrollbar: #384457;
+  }
+}
+
 * {
   box-sizing: border-box;
 }
@@ -18,6 +97,15 @@ button {
   font-family: inherit;
 }
 
+input {
+  background: var(--surface);
+  color: var(--text-primary);
+}
+
+input::placeholder {
+  color: var(--text-hint);
+}
+
 @keyframes shimmer {
   0% {
     background-position: 200% 0;
@@ -28,22 +116,30 @@ button {
 }
 
 .shimmer {
-  background-image: linear-gradient(90deg, #e5e7eb 0%, #f3f4f6 50%, #e5e7eb 100%);
+  background-image: linear-gradient(
+    90deg,
+    var(--shimmer-base) 0%,
+    var(--shimmer-mid) 50%,
+    var(--shimmer-base) 100%
+  );
   background-size: 200% 100%;
   animation: shimmer 1.5s infinite;
   border-radius: 6px;
 }
 
 .widget-card {
-  transition: all 0.35s cubic-bezier(0.4, 0, 0.2, 1);
+  transition:
+    transform 0.35s cubic-bezier(0.4, 0, 0.2, 1),
+    box-shadow 0.35s cubic-bezier(0.4, 0, 0.2, 1),
+    border-color 0.35s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 .widget-card:hover {
   transform: translateY(-3px);
-  border-color: rgba(79, 70, 229, 0.2);
+  border-color: rgba(99, 102, 241, 0.35);
   box-shadow:
-    0 16px 32px rgba(0, 0, 0, 0.07),
-    0 6px 12px rgba(79, 70, 229, 0.05);
+    0 16px 32px rgba(0, 0, 0, 0.1),
+    0 6px 12px rgba(79, 70, 229, 0.08);
 }
 
 ::-webkit-scrollbar {
@@ -52,6 +148,6 @@ button {
 }
 
 ::-webkit-scrollbar-thumb {
-  background: #d1d5db;
+  background: var(--scrollbar);
   border-radius: 8px;
 }

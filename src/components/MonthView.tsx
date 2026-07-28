@@ -3,6 +3,7 @@ import type { CSSProperties } from "react";
 import type { CorporateEvent } from "../types";
 import { eventTypeMeta, tokens } from "../theme";
 import { EventTypeChip, StatusBadge } from "./badges";
+import { ChevronLeftIcon, ChevronRightIcon } from "./icons";
 import {
   WEEKDAY_LABELS,
   buildMonthMatrix,
@@ -40,13 +41,15 @@ export function MonthView({ events }: { events: CorporateEvent[] }) {
   const navBtn: CSSProperties = {
     cursor: "pointer",
     border: `1px solid ${tokens.borderSolid}`,
-    background: "#fff",
+    background: tokens.surface,
     borderRadius: 8,
     width: 28,
     height: 28,
-    fontSize: 15,
+    fontSize: 12,
     color: tokens.textSecondary,
-    lineHeight: 1,
+    display: "inline-flex",
+    alignItems: "center",
+    justifyContent: "center",
   };
 
   return (
@@ -56,7 +59,9 @@ export function MonthView({ events }: { events: CorporateEvent[] }) {
           {formatMonthYear(new Date(cursor.year, cursor.month, 1))}
         </div>
         <div style={{ display: "flex", gap: 6 }}>
-          <button style={navBtn} onClick={() => shift(-1)} aria-label="Previous month">‹</button>
+          <button style={navBtn} onClick={() => shift(-1)} aria-label="Previous month">
+            <ChevronLeftIcon size={16} />
+          </button>
           <button
             style={{ ...navBtn, width: "auto", padding: "0 10px", fontSize: 12, fontWeight: 600 }}
             onClick={() => {
@@ -66,7 +71,9 @@ export function MonthView({ events }: { events: CorporateEvent[] }) {
           >
             Today
           </button>
-          <button style={navBtn} onClick={() => shift(1)} aria-label="Next month">›</button>
+          <button style={navBtn} onClick={() => shift(1)} aria-label="Next month">
+            <ChevronRightIcon size={16} />
+          </button>
         </div>
       </div>
 
@@ -92,7 +99,7 @@ export function MonthView({ events }: { events: CorporateEvent[] }) {
                 minHeight: 62,
                 padding: 6,
                 borderRadius: 10,
-                background: isSelected ? tokens.primaryLight : "#ffffff",
+                background: isSelected ? tokens.primaryLight : tokens.surface,
                 border: `1px solid ${isSelected ? tokens.primaryBorder : tokens.border}`,
                 opacity: inMonth ? 1 : 0.4,
                 display: "flex",

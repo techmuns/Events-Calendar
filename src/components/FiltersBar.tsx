@@ -30,7 +30,7 @@ function Segmented<T extends string | number>({
   onChange: (v: T) => void;
 }) {
   return (
-    <div style={{ display: "inline-flex", background: "#f3f4f6", borderRadius: 8, padding: 2 }}>
+    <div style={{ display: "inline-flex", background: tokens.surface2, borderRadius: 8, padding: 2 }}>
       {options.map((o) => {
         const active = o.key === value;
         return (
@@ -44,7 +44,7 @@ function Segmented<T extends string | number>({
               fontWeight: 600,
               padding: "5px 12px",
               borderRadius: 6,
-              background: active ? "#ffffff" : "transparent",
+              background: active ? tokens.surface : "transparent",
               color: active ? tokens.primaryText : tokens.textMuted,
               boxShadow: active ? "0 1px 2px rgba(0,0,0,0.08)" : "none",
               transition: "all 0.2s",
@@ -110,7 +110,7 @@ export function FiltersBar({
                   fontWeight: 600,
                   padding: "5px 11px",
                   borderRadius: 8,
-                  background: active ? m.bg : "#ffffff",
+                  background: active ? m.bg : tokens.surface,
                   color: active ? m.text : tokens.textHint,
                   border: `1px solid ${active ? m.border : tokens.borderSolid}`,
                   transition: "all 0.2s",

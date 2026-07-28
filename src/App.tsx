@@ -13,6 +13,9 @@ import { DetailTable } from "./components/DetailTable";
 import { SourcesWidget } from "./components/SourcesWidget";
 import { WidgetCard } from "./components/WidgetCard";
 import { ErrorState, ShimmerRows } from "./components/states";
+import { Heatmap } from "./components/Heatmap";
+import { useTheme } from "./hooks/useTheme";
+import { CalendarIcon, MoonIcon, RefreshIcon, SunIcon } from "./components/icons";
 
 const DEFAULT_FILTERS: Filters = {
   universe: "ALL",
@@ -39,7 +42,7 @@ function ViewToggle({ view, onChange }: { view: View; onChange: (v: View) => voi
     { key: "month", label: "Month" },
   ];
   return (
-    <div style={{ display: "inline-flex", background: "#f3f4f6", borderRadius: 8, padding: 2 }}>
+    <div style={{ display: "inline-flex", background: tokens.surface2, borderRadius: 8, padding: 2 }}>
       {opts.map((o) => {
         const active = o.key === view;
         return (
@@ -53,7 +56,7 @@ function ViewToggle({ view, onChange }: { view: View; onChange: (v: View) => voi
               fontWeight: 600,
               padding: "5px 12px",
               borderRadius: 6,
-              background: active ? "#fff" : "transparent",
+              background: active ? tokens.surface : "transparent",
               color: active ? tokens.primaryText : tokens.textMuted,
               boxShadow: active ? "0 1px 2px rgba(0,0,0,0.08)" : "none",
             }}
@@ -71,6 +74,7 @@ export default function App() {
   const [view, setView] = useState<View>("agenda");
   const { result, loading, error, reload } = useEvents();
   const { ticker, tickerCompany } = useHostContext();
+  const { isDark, toggle } = useTheme();
 
   const filtered = result ? applyFilters(result.events, filters) : [];
 
@@ -87,7 +91,7 @@ export default function App() {
   const actionBtn: CSSProperties = {
     cursor: "pointer",
     border: `1px solid ${tokens.borderSolid}`,
-    background: "#fff",
+    background: tokens.surface,
     borderRadius: 8,
     padding: "6px 12px",
     fontSize: 12.5,
@@ -114,6 +118,9 @@ export default function App() {
         }}
       >
         <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+          <span style={{ color: tokens.primary, display: "inline-flex" }}>
+            <CalendarIcon size={18} />
+          </span>
           <h1 style={{ fontSize: 15, fontWeight: 700, color: tokens.textPrimary, margin: 0 }}>
             Events Calendar
           </h1>
@@ -155,8 +162,20 @@ export default function App() {
         </div>
         <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
           <ViewToggle view={view} onChange={setView} />
-          <button style={actionBtn} onClick={() => void reload()} disabled={loading}>
-            {loading ? "Refreshing…" : "↻ Refresh"}
+          <button
+            style={{ ...actionBtn, display: "inline-flex", alignItems: "center", gap: 6 }}
+            onClick={() => void reload()}
+            disabled={loading}
+          >
+            <RefreshIcon size={14} /> {loading ? "Refreshing…" : "Refresh"}
+          </button>
+          <button
+            aria-label="Toggle light/dark theme"
+            title="Toggle theme"
+            onClick={toggle}
+            style={{ ...actionBtn, width: 32, padding: 0, display: "inline-flex", alignItems: "center", justifyContent: "center" }}
+          >
+            {isDark ? <SunIcon size={15} /> : <MoonIcon size={15} />}
           </button>
         </div>
       </header>
@@ -173,6 +192,12 @@ export default function App() {
             <KpiRow events={filtered} generatedAt={result.generatedAt} live={result.live} />
           ) : (
             <KpiShimmer />
+          )}
+
+          {result && filtered.length > 0 && (
+            <WidgetCard title="Earnings-season density" subtitle="Upcoming event volume by week">
+              <Heatmap events={filtered} />
+            </WidgetCard>
           )}
 
           <WidgetCard

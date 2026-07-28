@@ -1,6 +1,6 @@
 import type { CSSProperties } from "react";
 import type { EventStatus, EventType } from "../types";
-import { eventTypeMeta, statusMeta } from "../theme";
+import { eventTypeMeta, statusMeta, tokens } from "../theme";
 
 const chipBase: CSSProperties = {
   display: "inline-flex",
@@ -49,9 +49,9 @@ export function ExchangePill({ exchange }: { exchange: string }) {
         ...chipBase,
         fontSize: 10,
         fontWeight: 600,
-        color: "#6b7280",
-        background: "#f3f4f6",
-        border: "1px solid #e5e7eb",
+        color: tokens.textMuted,
+        background: tokens.surface2,
+        border: `1px solid ${tokens.borderSolid}`,
       }}
     >
       {exchange}
