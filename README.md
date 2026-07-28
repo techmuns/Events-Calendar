@@ -9,6 +9,20 @@ dashboard on top of a structured events feed built from free public exchange dat
 Early / greenfield. The agreed v1 baseline lives in
 **[`docs/EVENTS_CALENDAR_SPEC.md`](docs/EVENTS_CALENDAR_SPEC.md)** — read that first.
 
+The repo currently contains the **app scaffold** (Vite + React + TypeScript) — the Layer 3
+dashboard shell. Calendar widgets are wired up in later steps once the events API exists.
+
+## Getting started
+
+```bash
+npm install      # install dependencies
+npm run dev      # start the dev server
+npm run build    # type-check + production build to dist/
+npm run preview  # preview the production build
+```
+
+Requires Node 18+ (developed on Node 22).
+
 ## At a glance
 
 - **Market:** India (NSE + BSE)
