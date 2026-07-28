@@ -1,107 +1,206 @@
-/**
- * Events Calendar — application shell (scaffold).
- *
- * This is the minimal Layer 3 shell described in docs/EVENTS_CALENDAR_SPEC.md.
- * It renders the mandated Munshot 3-zone iframe layout with a placeholder empty
- * state. Widgets (filters, KPIs, agenda/month calendar, detail table, sources)
- * are wired up in later steps once the events API (Layer 2) is available.
- */
+import { useState } from "react";
+import type { CSSProperties } from "react";
+import type { Filters } from "./types";
+import { tokens } from "./theme";
+import { useEvents } from "./hooks/useEvents";
+import { useHostContext } from "./hooks/useHostContext";
+import { applyFilters } from "./lib/filter";
+import { FiltersBar } from "./components/FiltersBar";
+import { KpiRow } from "./components/KpiRow";
+import { AgendaView } from "./components/AgendaView";
+import { MonthView } from "./components/MonthView";
+import { DetailTable } from "./components/DetailTable";
+import { SourcesWidget } from "./components/SourcesWidget";
+import { WidgetCard } from "./components/WidgetCard";
+import { ErrorState, ShimmerRows } from "./components/states";
 
-const shell: React.CSSProperties = {
-  display: "flex",
-  flexDirection: "column",
-  height: "100vh",
-  overflow: "hidden",
-  background: "linear-gradient(to bottom, rgba(249, 250, 251, 0.8), #ffffff)",
-  fontFamily: "system-ui, -apple-system, sans-serif",
-  color: "#111827",
+const DEFAULT_FILTERS: Filters = {
+  universe: "NIFTY500",
+  types: ["EARNINGS", "CONCALL", "DEMERGER"],
+  horizonDays: 90,
+  search: "",
 };
 
-const header: React.CSSProperties = {
-  position: "sticky",
-  top: 0,
-  zIndex: 10,
-  display: "flex",
-  alignItems: "center",
-  justifyContent: "space-between",
-  padding: "0 24px",
-  height: 48,
-  background: "rgba(255, 255, 255, 0.95)",
-  backdropFilter: "blur(8px)",
-  borderBottom: "1px solid #e5e7eb",
-  flexShrink: 0,
-};
+type View = "agenda" | "month";
 
-const main: React.CSSProperties = {
-  flex: 1,
-  overflow: "auto",
-  padding: "24px 32px",
-  display: "flex",
-  alignItems: "center",
-  justifyContent: "center",
-};
+function KpiShimmer() {
+  return (
+    <div style={{ display: "grid", gap: 16, gridTemplateColumns: "repeat(auto-fit, minmax(190px, 1fr))" }}>
+      {Array.from({ length: 4 }).map((_, i) => (
+        <div key={i} className="shimmer" style={{ height: 82, borderRadius: 14 }} />
+      ))}
+    </div>
+  );
+}
 
-const emptyCard: React.CSSProperties = {
-  maxWidth: 460,
-  textAlign: "center",
-  background: "rgba(255, 255, 255, 0.9)",
-  border: "1px solid rgba(229, 231, 235, 0.8)",
-  borderRadius: 16,
-  padding: "40px 32px",
-  boxShadow: "0 1px 4px rgba(0,0,0,0.04)",
-};
+function ViewToggle({ view, onChange }: { view: View; onChange: (v: View) => void }) {
+  const opts: { key: View; label: string }[] = [
+    { key: "agenda", label: "Agenda" },
+    { key: "month", label: "Month" },
+  ];
+  return (
+    <div style={{ display: "inline-flex", background: "#f3f4f6", borderRadius: 8, padding: 2 }}>
+      {opts.map((o) => {
+        const active = o.key === view;
+        return (
+          <button
+            key={o.key}
+            onClick={() => onChange(o.key)}
+            style={{
+              border: "none",
+              cursor: "pointer",
+              fontSize: 12.5,
+              fontWeight: 600,
+              padding: "5px 12px",
+              borderRadius: 6,
+              background: active ? "#fff" : "transparent",
+              color: active ? tokens.primaryText : tokens.textMuted,
+              boxShadow: active ? "0 1px 2px rgba(0,0,0,0.08)" : "none",
+            }}
+          >
+            {o.label}
+          </button>
+        );
+      })}
+    </div>
+  );
+}
 
 export default function App() {
+  const [filters, setFilters] = useState<Filters>(DEFAULT_FILTERS);
+  const [view, setView] = useState<View>("agenda");
+  const { result, loading, error, reload } = useEvents();
+  const { ticker, tickerCompany } = useHostContext();
+
+  const filtered = result ? applyFilters(result.events, filters) : [];
+
+  const shell: CSSProperties = {
+    display: "flex",
+    flexDirection: "column",
+    height: "100vh",
+    overflow: "hidden",
+    background: tokens.pageBg,
+    fontFamily: tokens.font,
+    color: tokens.textPrimary,
+  };
+
+  const actionBtn: CSSProperties = {
+    cursor: "pointer",
+    border: `1px solid ${tokens.borderSolid}`,
+    background: "#fff",
+    borderRadius: 8,
+    padding: "6px 12px",
+    fontSize: 12.5,
+    fontWeight: 600,
+    color: tokens.textSecondary,
+  };
+
   return (
     <div style={shell}>
-      <header style={header}>
-        <h1 style={{ fontSize: 15, fontWeight: 700, color: "#111827", margin: 0 }}>
-          Events Calendar
-        </h1>
-        <span
-          style={{
-            fontSize: 10,
-            fontWeight: 600,
-            textTransform: "uppercase",
-            letterSpacing: "0.05em",
-            padding: "2px 8px",
-            borderRadius: 6,
-            border: "1px solid #fde68a",
-            background: "#fffbeb",
-            color: "#d97706",
-          }}
-        >
-          India · NSE/BSE
-        </span>
+      <header
+        style={{
+          position: "sticky",
+          top: 0,
+          zIndex: 10,
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-between",
+          padding: "0 24px",
+          height: 48,
+          background: tokens.cardHeaderBg,
+          backdropFilter: "blur(8px)",
+          borderBottom: `1px solid ${tokens.borderSolid}`,
+          flexShrink: 0,
+        }}
+      >
+        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+          <h1 style={{ fontSize: 15, fontWeight: 700, color: tokens.textPrimary, margin: 0 }}>
+            Events Calendar
+          </h1>
+          {ticker && (
+            <span
+              style={{
+                display: "inline-flex",
+                alignItems: "center",
+                gap: 6,
+                padding: "2px 10px",
+                background: tokens.primaryLight,
+                color: tokens.primaryText,
+                borderRadius: 99,
+                fontSize: 12,
+                fontWeight: 600,
+                border: `1px solid ${tokens.primaryBorder}`,
+              }}
+            >
+              <span style={{ width: 6, height: 6, background: tokens.primary, borderRadius: "50%" }} />
+              {ticker}
+              {tickerCompany && <span style={{ color: "#818cf8", fontWeight: 400 }}>· {tickerCompany}</span>}
+            </span>
+          )}
+          <span
+            style={{
+              fontSize: 10,
+              fontWeight: 600,
+              textTransform: "uppercase",
+              letterSpacing: "0.05em",
+              padding: "2px 8px",
+              borderRadius: 6,
+              border: "1px solid #fde68a",
+              background: "#fffbeb",
+              color: "#d97706",
+            }}
+          >
+            India · NSE/BSE
+          </span>
+        </div>
+        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+          <ViewToggle view={view} onChange={setView} />
+          <button style={actionBtn} onClick={() => void reload()} disabled={loading}>
+            {loading ? "Refreshing…" : "↻ Refresh"}
+          </button>
+        </div>
       </header>
 
-      <main id="dashboard-main" data-dashboard-capture-root="true" style={main}>
-        <div style={emptyCard}>
-          <div
-            style={{
-              width: 44,
-              height: 44,
-              margin: "0 auto 16px",
-              borderRadius: 12,
-              background: "#eef2ff",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              fontSize: 22,
-            }}
-            aria-hidden
+      <main
+        id="dashboard-main"
+        data-dashboard-capture-root="true"
+        style={{ flex: 1, overflow: "auto", padding: "24px 32px" }}
+      >
+        <div style={{ display: "flex", flexDirection: "column", gap: 20, maxWidth: 1280, margin: "0 auto" }}>
+          <FiltersBar filters={filters} onChange={setFilters} />
+
+          {result ? (
+            <KpiRow events={filtered} generatedAt={result.generatedAt} live={result.live} />
+          ) : (
+            <KpiShimmer />
+          )}
+
+          <WidgetCard
+            title={view === "agenda" ? "Upcoming events" : "Calendar"}
+            subtitle={
+              result
+                ? `${filtered.length} events · next ${filters.horizonDays} days`
+                : "Loading events…"
+            }
           >
-            📅
-          </div>
-          <h2 style={{ margin: "0 0 8px", fontSize: 18, fontWeight: 700 }}>
-            Events Calendar — coming together
-          </h2>
-          <p style={{ margin: 0, fontSize: 14, lineHeight: 1.5, color: "#6b7280" }}>
-            Upcoming earnings, concalls, and demergers for Indian listed companies.
-            This is the app scaffold; the calendar widgets are wired up once the
-            events API is in place. See{" "}
-            <code style={{ fontSize: 13 }}>docs/EVENTS_CALENDAR_SPEC.md</code>.
-          </p>
+            {error ? (
+              <ErrorState message={error} />
+            ) : !result ? (
+              <ShimmerRows rows={6} />
+            ) : view === "agenda" ? (
+              <AgendaView events={filtered} />
+            ) : (
+              <MonthView events={filtered} />
+            )}
+          </WidgetCard>
+
+          <WidgetCard title="All events" subtitle="Sortable — click a column header">
+            {!result ? <ShimmerRows rows={4} /> : <DetailTable events={filtered} />}
+          </WidgetCard>
+
+          <WidgetCard title="Sources & freshness">
+            {!result ? <ShimmerRows rows={3} /> : <SourcesWidget result={result} />}
+          </WidgetCard>
         </div>
       </main>
     </div>
