@@ -3,7 +3,7 @@
 // one-line swap of `eventsProvider` below — no component changes.
 
 import type { EventsResult } from "../types";
-import { buildSampleEvents } from "./sampleEvents";
+import { buildSampleConcalls, buildSampleEvents } from "./sampleEvents";
 
 export interface EventsProvider {
   getEvents(): Promise<EventsResult>;
@@ -15,6 +15,7 @@ export const sampleProvider: EventsProvider = {
     await new Promise((r) => setTimeout(r, 450));
     return {
       events: buildSampleEvents(),
+      concalls: buildSampleConcalls(),
       generatedAt: new Date().toISOString(),
       source: "Sample dataset",
       live: false,
@@ -28,7 +29,8 @@ export const apiProvider: EventsProvider = {
   async getEvents() {
     const res = await fetch("/api/corporate-calendar");
     if (!res.ok) throw new Error(`Feed unavailable (HTTP ${res.status})`);
-    return (await res.json()) as EventsResult;
+    const data = (await res.json()) as EventsResult;
+    return { ...data, concalls: data.concalls ?? [] };
   },
 };
 

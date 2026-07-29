@@ -27,10 +27,24 @@ export interface CorporateEvent {
   marketCap?: MarketCap;
 }
 
+// Concalls have no structured future date on BSE/NSE (it lives inside the PDF
+// filing), so they're surfaced as "recently announced" intimations rather than
+// dated timeline events.
+export interface ConcallItem {
+  id: string;
+  company: string;
+  ticker: string;
+  summary: string; // what was filed, e.g. "Investor Conference Call"
+  filedDate: string; // ISO date the intimation was filed
+  exchange: Exchange;
+  sourceUrl?: string; // link to the filing (which carries the exact date/time)
+}
+
 export interface EventsResult {
   events: CorporateEvent[];
+  concalls: ConcallItem[];
   generatedAt: string; // ISO timestamp of when this data was produced
-  source: string; // human label, e.g. "Sample dataset" or "NSE + BSE (live)"
+  source: string; // human label, e.g. "Sample dataset" or "BSE + NSE (live)"
   live: boolean; // false for the seed data, true once wired to the feed
 }
 

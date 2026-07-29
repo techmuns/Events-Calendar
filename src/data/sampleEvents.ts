@@ -3,7 +3,7 @@
 // generated as offsets from *today* so the calendar is always populated while
 // we run on sample data. Replaced by the live feed in the next step.
 
-import type { CorporateEvent, EventType, EventStatus, Exchange, MarketCap } from "../types";
+import type { CorporateEvent, ConcallItem, EventType, EventStatus, Exchange, MarketCap } from "../types";
 import { addDays, toISO, todayStart } from "../lib/dates";
 
 export const WATCHLIST_TICKERS = ["RELIANCE", "TCS", "INFY", "HDFCBANK", "ITC", "TATAMOTORS"];
@@ -69,7 +69,8 @@ function sourceFor(type: EventType): string {
 
 export function buildSampleEvents(): CorporateEvent[] {
   const base = todayStart();
-  return SEEDS.map((s) => {
+  // Concalls are surfaced separately (they lack structured dates), not on the timeline.
+  return SEEDS.filter((s) => s.eventType !== "CONCALL").map((s) => {
     const date = toISO(addDays(base, s.offset));
     const event: CorporateEvent = {
       id: `${s.ticker}_${s.eventType}_${date}`,
@@ -89,4 +90,26 @@ export function buildSampleEvents(): CorporateEvent[] {
     if (s.marketCap) event.marketCap = s.marketCap;
     return event;
   });
+}
+
+const SAMPLE_CONCALLS: Array<{ company: string; ticker: string; summary: string; offset: number; exchange: Exchange }> = [
+  { company: "Tata Consultancy Services", ticker: "TCS", summary: "Earnings Conference Call", offset: 0, exchange: "NSE" },
+  { company: "Infosys", ticker: "INFY", summary: "Investor & Analyst Conference Call", offset: 0, exchange: "NSE" },
+  { company: "HDFC Bank", ticker: "HDFCBANK", summary: "Schedule of Analyst / Investor Meet", offset: 0, exchange: "BSE" },
+  { company: "Reliance Industries", ticker: "RELIANCE", summary: "Earnings Call intimation", offset: -1, exchange: "NSE" },
+  { company: "Maruti Suzuki India", ticker: "MARUTI", summary: "Investor Conference Call", offset: -1, exchange: "NSE" },
+  { company: "Persistent Systems", ticker: "PERSISTENT", summary: "Q1 FY27 Earnings Call", offset: -2, exchange: "BSE" },
+];
+
+export function buildSampleConcalls(): ConcallItem[] {
+  const base = todayStart();
+  return SAMPLE_CONCALLS.map((c, i) => ({
+    id: `sample_concall_${i}`,
+    company: c.company,
+    ticker: c.ticker,
+    summary: c.summary,
+    filedDate: toISO(addDays(base, c.offset)),
+    exchange: c.exchange,
+    sourceUrl: c.exchange === "NSE" ? NSE_ANN : "https://www.bseindia.com/corporates/ann.html",
+  }));
 }

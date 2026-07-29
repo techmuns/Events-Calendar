@@ -15,6 +15,7 @@ import { WidgetCard } from "./components/WidgetCard";
 import { ErrorState, ShimmerRows } from "./components/states";
 import { Heatmap } from "./components/Heatmap";
 import { EventDrawer } from "./components/EventDrawer";
+import { ConcallsPanel } from "./components/ConcallsPanel";
 import { useTheme } from "./hooks/useTheme";
 import { useWatchlist } from "./hooks/useWatchlist";
 import { CalendarIcon, MoonIcon, RefreshIcon, SunIcon } from "./components/icons";
@@ -227,6 +228,15 @@ export default function App() {
               <MonthView events={filtered} onSelect={setSelected} />
             )}
           </WidgetCard>
+
+          {result && filters.types.includes("CONCALL") && (
+            <WidgetCard
+              title="Recently announced concalls"
+              subtitle="Analyst / investor call intimations — from BSE &amp; NSE filings"
+            >
+              <ConcallsPanel concalls={result.concalls} />
+            </WidgetCard>
+          )}
 
           <WidgetCard title="All events" subtitle="Sortable — click a column header">
             {!result ? <ShimmerRows rows={4} /> : <DetailTable events={filtered} onSelect={setSelected} />}

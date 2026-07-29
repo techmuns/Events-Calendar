@@ -37,6 +37,16 @@ interface CorporateEvent {
   sector: string;
 }
 
+interface ConcallItem {
+  id: string;
+  company: string;
+  ticker: string;
+  summary: string;
+  filedDate: string;
+  exchange: "NSE" | "BSE";
+  sourceUrl?: string;
+}
+
 const NSE = "https://www.nseindia.com";
 const BSE_API = "https://api.bseindia.com/BseIndiaAPI/api";
 const UA =
@@ -220,20 +230,76 @@ function todayISO(): string {
   return new Date().toISOString().slice(0, 10);
 }
 
+function nseDate(d: Date): string {
+  const dd = String(d.getDate()).padStart(2, "0");
+  const mm = String(d.getMonth() + 1).padStart(2, "0");
+  return `${dd}-${mm}-${d.getFullYear()}`;
+}
+
+// Post-facto filings we don't want in a "recently announced" concall list.
+const CC_EXCLUDE = /transcript|audio|recording|newspaper|outcome of|presentation|proceeding/i;
+
+function cleanSummary(text: string): string {
+  return (text ?? "")
+    .replace(/^.*?informed the exchange about\s*/i, "")
+    .replace(/\s+/g, " ")
+    .trim()
+    .slice(0, 130);
+}
+
+// NSE analyst-meet / concall intimations (the "Analysts/Institutional Investor
+// Meet/Con. Call" filings). The exact call date lives in the linked PDF.
+function parseNseConcalls(data: unknown): ConcallItem[] {
+  if (!Array.isArray(data)) return [];
+  const out: ConcallItem[] = [];
+  for (const r of data as Array<Record<string, string>>) {
+    if (!/con\.? ?call|investor meet|analyst/i.test(r.desc ?? "")) continue;
+    const text = r.attchmntText ?? "";
+    if (CC_EXCLUDE.test(text)) continue;
+    const filedDate = isoDate(r.an_dt) ?? (r.sort_date ?? "").slice(0, 10);
+    if (!filedDate) continue;
+    const ticker = (r.symbol ?? "").trim();
+    out.push({
+      id: `NSE_CC_${r.seq_id || ticker + filedDate}`,
+      company: titleCase(r.sm_name ?? ticker),
+      ticker,
+      summary: cleanSummary(text) || "Analyst / Investor Meet",
+      filedDate,
+      exchange: "NSE",
+      sourceUrl: r.attchmntFile || undefined,
+    });
+  }
+  out.sort((a, b) => b.filedDate.localeCompare(a.filedDate));
+  return out.slice(0, 40);
+}
+
 async function buildLiveResult() {
   const cookie = await nseCookie();
-  const settled = await Promise.allSettled([
-    bseJson("/Corpforthresults/w").then(parseBseForthResults),
+  const now = new Date();
+  const from = new Date(now);
+  from.setDate(from.getDate() - 4);
+
+  const [settled, concalls] = await Promise.all([
+    Promise.allSettled([
+      bseJson("/Corpforthresults/w").then(parseBseForthResults),
+      nseJson(
+        "/api/corporate-board-meetings?index=equities",
+        `${NSE}/companies-listing/corporate-filings-board-meetings`,
+        cookie,
+      ).then(parseBoardMeetings),
+      nseJson(
+        "/api/corporates-corporateActions?index=equities",
+        `${NSE}/companies-listing/corporate-filings-actions`,
+        cookie,
+      ).then(parseCorporateActions),
+    ]),
     nseJson(
-      "/api/corporate-board-meetings?index=equities",
-      `${NSE}/companies-listing/corporate-filings-board-meetings`,
+      `/api/corporate-announcements?index=equities&from_date=${nseDate(from)}&to_date=${nseDate(now)}`,
+      `${NSE}/companies-listing/corporate-filings-announcements`,
       cookie,
-    ).then(parseBoardMeetings),
-    nseJson(
-      "/api/corporates-corporateActions?index=equities",
-      `${NSE}/companies-listing/corporate-filings-actions`,
-      cookie,
-    ).then(parseCorporateActions),
+    )
+      .then(parseNseConcalls)
+      .catch(() => [] as ConcallItem[]),
   ]);
 
   const sources = { bse: false, nse: false };
@@ -245,6 +311,7 @@ async function buildLiveResult() {
       if (i > 0 && r.value.length) sources.nse = true;
     }
   });
+  if (concalls.length) sources.nse = true;
 
   const today = todayISO();
   const events = dedupe(all)
@@ -254,9 +321,10 @@ async function buildLiveResult() {
   const label = [sources.bse && "BSE", sources.nse && "NSE"].filter(Boolean).join(" + ");
   return {
     events,
+    concalls,
     generatedAt: new Date().toISOString(),
     source: label ? `${label} (live)` : "Exchanges unreachable",
-    live: events.length > 0,
+    live: events.length > 0 || concalls.length > 0,
   };
 }
 
@@ -272,6 +340,7 @@ async function handleApi(request: Request, ctx: Ctx): Promise<Response> {
   } catch (err) {
     body = {
       events: [],
+      concalls: [],
       generatedAt: new Date().toISOString(),
       source: "Exchanges unreachable",
       live: false,
