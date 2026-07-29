@@ -1,15 +1,14 @@
 /**
  * Cloudflare Worker for the Events Calendar.
  *
- * Serves the built SPA (static assets) and exposes a live corporate-events API
- * at /api/corporate-calendar, sourced server-side from NSE's free public
- * endpoints (browsers can't call NSE directly — CORS). Results are cached at
- * the edge for a few minutes. If NSE is unreachable from Cloudflare, the API
- * returns an empty live result and the frontend falls back to sample data, so
- * the dashboard never breaks.
- *
- * No secrets, no D1 yet — on-demand fetch + Cache API. Persistence and
- * date-change history (for the New/Revised features) come with D1 next.
+ * Serves the built SPA (static assets) and a live corporate-events API at
+ * /api/corporate-calendar, sourced server-side from the exchanges' free public
+ * endpoints (browsers can't call them directly — CORS):
+ *   - Earnings  <- BSE Forthcoming Results (Result Calendar) + NSE board meetings
+ *   - Demergers <- NSE corporate actions
+ * Results are merged, deduped, filtered to upcoming, and edge-cached. If the
+ * exchanges are unreachable from Cloudflare, the API returns an empty live
+ * result and the frontend falls back to sample data, so nothing breaks.
  */
 
 interface Env {
@@ -39,18 +38,17 @@ interface CorporateEvent {
 }
 
 const NSE = "https://www.nseindia.com";
+const BSE_API = "https://api.bseindia.com/BseIndiaAPI/api";
 const UA =
   "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36";
-const CACHE_SECONDS = 600;
+const CACHE_SECONDS = 900;
 
 const MONTHS: Record<string, string> = {
   Jan: "01", Feb: "02", Mar: "03", Apr: "04", May: "05", Jun: "06",
   Jul: "07", Aug: "08", Sep: "09", Oct: "10", Nov: "11", Dec: "12",
 };
 
-// A compact Nifty 50 membership list, used to tag events so the universe
-// filters work on live data. Nifty 500 tagging (via the constituents CSV)
-// follows.
+// Compact Nifty 50 membership so the universe filter works on live data.
 const NIFTY50 = new Set([
   "ADANIENT", "ADANIPORTS", "APOLLOHOSP", "ASIANPAINT", "AXISBANK", "BAJAJ-AUTO",
   "BAJFINANCE", "BAJAJFINSV", "BEL", "BHARTIARTL", "BPCL", "CIPLA", "COALINDIA",
@@ -62,10 +60,11 @@ const NIFTY50 = new Set([
   "WIPRO",
 ]);
 
-function isoDate(dmy: string): string | null {
-  const m = /(\d{1,2})-([A-Za-z]{3})-(\d{4})/.exec(dmy ?? "");
+// Handles "29 Jul 2026" (BSE) and "29-Jul-2026" (NSE).
+function isoDate(s: string): string | null {
+  const m = /(\d{1,2})[-\s]([A-Za-z]{3})[-\s](\d{4})/.exec(s ?? "");
   if (!m) return null;
-  const mon = MONTHS[m[2]];
+  const mon = MONTHS[m[2][0].toUpperCase() + m[2].slice(1).toLowerCase()];
   if (!mon) return null;
   return `${m[3]}-${mon}-${m[1].padStart(2, "0")}`;
 }
@@ -75,10 +74,12 @@ function indicesFor(ticker: string): string[] {
 }
 
 function titleCase(s: string): string {
-  return s
-    .toLowerCase()
-    .replace(/\b\w/g, (c) => c.toUpperCase())
-    .trim();
+  return s.toLowerCase().replace(/\b\w/g, (c) => c.toUpperCase()).trim();
+}
+
+// BSE Long_Name sometimes carries trailing markers like "Ltd-$".
+function cleanName(s: string): string {
+  return (s ?? "").replace(/-\$?\s*$/, "").trim();
 }
 
 async function nseCookie(): Promise<string> {
@@ -106,24 +107,61 @@ async function nseJson(path: string, referer: string, cookie: string): Promise<u
   return res.json();
 }
 
+async function bseJson(path: string): Promise<unknown> {
+  const res = await fetch(`${BSE_API}${path}`, {
+    headers: {
+      "User-Agent": UA,
+      Accept: "application/json, text/plain, */*",
+      Origin: "https://www.bseindia.com",
+      Referer: "https://www.bseindia.com/",
+    },
+  });
+  if (!res.ok) throw new Error(`BSE ${path} -> ${res.status}`);
+  return res.json();
+}
+
+// BSE Forthcoming Results (the Result Calendar) — the primary earnings source.
+function parseBseForthResults(data: unknown): CorporateEvent[] {
+  if (!Array.isArray(data)) return [];
+  const out: CorporateEvent[] = [];
+  for (const r of data as Array<Record<string, string>>) {
+    const date = isoDate(r.meeting_date);
+    if (!date) continue;
+    const ticker = (r.short_name ?? "").trim();
+    out.push({
+      id: `BSE_${ticker || r.scrip_Code}_EARNINGS_${date}`,
+      company: cleanName(r.Long_Name || ticker),
+      ticker,
+      eventType: "EARNINGS",
+      subtype: "Results",
+      date,
+      status: "CONFIRMED",
+      exchange: "BSE",
+      sourceUrl: r.URL || "https://www.bseindia.com/corporates/Forth_Results",
+      indices: indicesFor(ticker),
+      sector: "",
+    });
+  }
+  return out;
+}
+
+// NSE board meetings called to consider financial results.
 function parseBoardMeetings(data: unknown): CorporateEvent[] {
   if (!Array.isArray(data)) return [];
   const out: CorporateEvent[] = [];
   for (const r of data as Array<Record<string, string>>) {
     const desc = (r.bm_desc ?? "") + " " + (r.bm_purpose ?? "");
-    if (!/financial result|financial results/i.test(desc)) continue;
+    if (!/financial result/i.test(desc)) continue;
     const date = isoDate(r.bm_date);
     if (!date) continue;
     const ticker = (r.bm_symbol ?? "").trim();
-    const company = titleCase(r.sm_name ?? ticker);
-    const quarter = /Q[1-4]\s*FY?\s*\d{2,4}/i.exec(desc)?.[0];
     out.push({
       id: `NSE_${ticker}_EARNINGS_${date}`,
-      company,
+      company: titleCase(r.sm_name ?? ticker),
       ticker,
       isin: r.sm_isin || undefined,
       eventType: "EARNINGS",
-      subtype: quarter ? quarter.toUpperCase() : "Board Meeting — Financial Results",
+      subtype: "Board Meeting — Results",
       date,
       status: "CONFIRMED",
       exchange: "NSE",
@@ -135,6 +173,7 @@ function parseBoardMeetings(data: unknown): CorporateEvent[] {
   return out;
 }
 
+// NSE corporate actions filtered to demerger / scheme of arrangement.
 function parseCorporateActions(data: unknown): CorporateEvent[] {
   if (!Array.isArray(data)) return [];
   const out: CorporateEvent[] = [];
@@ -162,9 +201,18 @@ function parseCorporateActions(data: unknown): CorporateEvent[] {
   return out;
 }
 
+// Dedupe across exchanges by company + type + date (keep first — BSE wins).
+function normKey(e: CorporateEvent): string {
+  const c = e.company.toLowerCase().replace(/ltd|limited/g, "").replace(/[^a-z0-9]/g, "");
+  return `${e.eventType}_${c}_${e.date}`;
+}
+
 function dedupe(events: CorporateEvent[]): CorporateEvent[] {
   const seen = new Map<string, CorporateEvent>();
-  for (const e of events) if (!seen.has(e.id)) seen.set(e.id, e);
+  for (const e of events) {
+    const k = normKey(e);
+    if (!seen.has(k)) seen.set(k, e);
+  }
   return [...seen.values()];
 }
 
@@ -172,14 +220,10 @@ function todayISO(): string {
   return new Date().toISOString().slice(0, 10);
 }
 
-async function buildLiveResult(): Promise<{
-  events: CorporateEvent[];
-  generatedAt: string;
-  source: string;
-  live: boolean;
-}> {
+async function buildLiveResult() {
   const cookie = await nseCookie();
-  const results = await Promise.allSettled([
+  const settled = await Promise.allSettled([
+    bseJson("/Corpforthresults/w").then(parseBseForthResults),
     nseJson(
       "/api/corporate-board-meetings?index=equities",
       `${NSE}/companies-listing/corporate-filings-board-meetings`,
@@ -192,19 +236,27 @@ async function buildLiveResult(): Promise<{
     ).then(parseCorporateActions),
   ]);
 
-  const events = dedupe(
-    results.flatMap((r) => (r.status === "fulfilled" ? r.value : [])),
-  );
-  const today = todayISO();
-  const upcoming = events
-    .filter((e) => e.date >= today)
-    .sort((a, b) => a.date.localeCompare(b.date));
+  const sources = { bse: false, nse: false };
+  const all: CorporateEvent[] = [];
+  settled.forEach((r, i) => {
+    if (r.status === "fulfilled") {
+      all.push(...r.value);
+      if (i === 0 && r.value.length) sources.bse = true;
+      if (i > 0 && r.value.length) sources.nse = true;
+    }
+  });
 
+  const today = todayISO();
+  const events = dedupe(all)
+    .filter((e) => e.date >= today)
+    .sort((a, b) => a.date.localeCompare(b.date) || a.company.localeCompare(b.company));
+
+  const label = [sources.bse && "BSE", sources.nse && "NSE"].filter(Boolean).join(" + ");
   return {
-    events: upcoming,
+    events,
     generatedAt: new Date().toISOString(),
-    source: "NSE (live)",
-    live: upcoming.length > 0,
+    source: label ? `${label} (live)` : "Exchanges unreachable",
+    live: events.length > 0,
   };
 }
 
@@ -221,7 +273,7 @@ async function handleApi(request: Request, ctx: Ctx): Promise<Response> {
     body = {
       events: [],
       generatedAt: new Date().toISOString(),
-      source: "NSE unreachable",
+      source: "Exchanges unreachable",
       live: false,
       error: err instanceof Error ? err.message : "fetch failed",
     };
@@ -240,9 +292,7 @@ async function handleApi(request: Request, ctx: Ctx): Promise<Response> {
 export default {
   async fetch(request: Request, env: Env, ctx: Ctx): Promise<Response> {
     const url = new URL(request.url);
-    if (url.pathname === "/api/corporate-calendar") {
-      return handleApi(request, ctx);
-    }
+    if (url.pathname === "/api/corporate-calendar") return handleApi(request, ctx);
     if (url.pathname === "/api/health") {
       return new Response(JSON.stringify({ ok: true }), {
         headers: { "Content-Type": "application/json" },
