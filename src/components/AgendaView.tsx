@@ -1,10 +1,11 @@
 import type { CSSProperties } from "react";
 import type { CorporateEvent } from "../types";
+import type { EventDiff } from "../hooks/useEventDiff";
 import { tokens } from "../theme";
-import { EventTypeChip, StatusBadge, ExchangePill } from "./badges";
+import { ChangeBadge, EventTypeChip, StatusBadge, ExchangePill } from "./badges";
 import { EmptyState } from "./states";
 import { ExternalLinkIcon, StarIcon } from "./icons";
-import { type Bucket, bucketFor, parseISO, todayStart } from "../lib/dates";
+import { type Bucket, bucketFor, formatDate, parseISO, todayStart } from "../lib/dates";
 
 const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
 const BUCKET_ORDER: Bucket[] = ["Today", "This week", "Next week", "Later"];
@@ -39,7 +40,13 @@ function DateBlock({ iso }: { iso: string }) {
   );
 }
 
-function EventRow({ e, onSelect, isStarred, onToggleStar }: { e: CorporateEvent } & RowHandlers) {
+function EventRow({
+  e,
+  diff,
+  onSelect,
+  isStarred,
+  onToggleStar,
+}: { e: CorporateEvent; diff?: EventDiff } & RowHandlers) {
   const starred = isStarred(e.ticker);
   const row: CSSProperties = {
     display: "flex",
@@ -53,6 +60,7 @@ function EventRow({ e, onSelect, isStarred, onToggleStar }: { e: CorporateEvent 
     ev.stopPropagation();
     fn();
   };
+  const meta = [e.subtype, e.time, e.sector].filter(Boolean).join(" · ");
   return (
     <div style={row} onClick={() => onSelect(e)}>
       <button
@@ -70,10 +78,15 @@ function EventRow({ e, onSelect, isStarred, onToggleStar }: { e: CorporateEvent 
           <span style={{ fontSize: 12, color: tokens.textHint }}>{e.ticker}</span>
         </div>
         <div style={{ fontSize: 12.5, color: tokens.textMuted, marginTop: 2 }}>
-          {[e.subtype, e.time, e.sector].filter(Boolean).join(" · ")}
+          {meta}
+          {diff?.isRevised && diff.prevDate && (
+            <span style={{ color: "#f97316", fontWeight: 500 }}> · was {formatDate(diff.prevDate)}</span>
+          )}
         </div>
       </div>
       <div style={{ display: "flex", alignItems: "center", gap: 6, flexShrink: 0 }}>
+        {diff?.isNew && <ChangeBadge kind="new" />}
+        {diff?.isRevised && <ChangeBadge kind="moved" />}
         <EventTypeChip type={e.eventType} />
         <StatusBadge status={e.status} />
         <ExchangePill exchange={e.exchange} />
@@ -94,7 +107,11 @@ function EventRow({ e, onSelect, isStarred, onToggleStar }: { e: CorporateEvent 
   );
 }
 
-export function AgendaView({ events, ...handlers }: { events: CorporateEvent[] } & RowHandlers) {
+export function AgendaView({
+  events,
+  diffs,
+  ...handlers
+}: { events: CorporateEvent[]; diffs?: Map<string, EventDiff> } & RowHandlers) {
   if (events.length === 0) {
     return <EmptyState message="No events match these filters" hint="Try widening the horizon or switching the universe to All." />;
   }
@@ -126,7 +143,7 @@ export function AgendaView({ events, ...handlers }: { events: CorporateEvent[] }
             <span style={{ color: tokens.textHint, fontWeight: 600 }}> · {groups[b].length}</span>
           </div>
           {groups[b].map((e) => (
-            <EventRow key={e.id} e={e} {...handlers} />
+            <EventRow key={e.id} e={e} diff={diffs?.get(e.id)} {...handlers} />
           ))}
         </div>
       ))}

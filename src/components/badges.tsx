@@ -58,3 +58,22 @@ export function ExchangePill({ exchange }: { exchange: string }) {
     </span>
   );
 }
+
+export function ChangeBadge({ kind }: { kind: "new" | "moved" }) {
+  const color = kind === "new" ? "#2563eb" : "#f97316";
+  return (
+    <span
+      style={{
+        ...chipBase,
+        fontSize: 10,
+        textTransform: "uppercase",
+        letterSpacing: "0.04em",
+        color,
+        background: `color-mix(in srgb, ${color} 15%, transparent)`,
+        border: `1px solid color-mix(in srgb, ${color} 36%, transparent)`,
+      }}
+    >
+      {kind === "new" ? "New" : "Rescheduled"}
+    </span>
+  );
+}

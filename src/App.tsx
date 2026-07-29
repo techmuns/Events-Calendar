@@ -18,6 +18,7 @@ import { EventDrawer } from "./components/EventDrawer";
 import { ConcallsPanel } from "./components/ConcallsPanel";
 import { useTheme } from "./hooks/useTheme";
 import { useWatchlist } from "./hooks/useWatchlist";
+import { useEventDiff } from "./hooks/useEventDiff";
 import { CalendarIcon, MoonIcon, RefreshIcon, SunIcon } from "./components/icons";
 
 const DEFAULT_FILTERS: Filters = {
@@ -82,6 +83,10 @@ export default function App() {
   const [selected, setSelected] = useState<CorporateEvent | null>(null);
 
   const filtered = result ? applyFilters(result.events, filters, watchlist.set) : [];
+  const diffs = useEventDiff(result?.events ?? []);
+  let newCount = 0;
+  let revCount = 0;
+  diffs.forEach((d) => (d.isNew ? newCount++ : d.isRevised ? revCount++ : null));
 
   const shell: CSSProperties = {
     display: "flex",
@@ -209,7 +214,11 @@ export default function App() {
             title={view === "agenda" ? "Upcoming events" : "Calendar"}
             subtitle={
               result
-                ? `${filtered.length} events · next ${filters.horizonDays} days`
+                ? `${filtered.length} events · next ${filters.horizonDays} days${
+                    newCount || revCount
+                      ? ` · ${newCount} new, ${revCount} rescheduled since last visit`
+                      : ""
+                  }`
                 : "Loading events…"
             }
           >
@@ -220,6 +229,7 @@ export default function App() {
             ) : view === "agenda" ? (
               <AgendaView
                 events={filtered}
+                diffs={diffs}
                 onSelect={setSelected}
                 isStarred={watchlist.has}
                 onToggleStar={watchlist.toggle}
