@@ -230,6 +230,55 @@ function todayISO(): string {
   return new Date().toISOString().slice(0, 10);
 }
 
+// Nifty 50 / 500 constituents (free NSE index files) → index membership + sector.
+interface Constituent {
+  sector: string;
+  in50: boolean;
+  in500: boolean;
+}
+
+// CSV columns: Company Name, Industry, Symbol, Series, ISIN. Parse from the
+// right so commas inside company names don't shift the fields.
+function addCsvToMap(csv: string, map: Map<string, Constituent>, flag: "in50" | "in500"): void {
+  const lines = csv.split(/\r?\n/);
+  for (let i = 1; i < lines.length; i++) {
+    const p = lines[i].split(",");
+    if (p.length < 5) continue;
+    const symbol = p[p.length - 3].trim();
+    const industry = p[p.length - 4].trim();
+    if (!symbol) continue;
+    const cur = map.get(symbol) ?? { sector: "", in50: false, in500: false };
+    if (!cur.sector && industry) cur.sector = industry;
+    cur[flag] = true;
+    map.set(symbol, cur);
+  }
+}
+
+async function fetchConstituents(): Promise<Map<string, Constituent>> {
+  const base = "https://nsearchives.nseindia.com/content/indices";
+  const [n500, n50] = await Promise.all([
+    fetch(`${base}/ind_nifty500list.csv`, { headers: { "User-Agent": UA } }).then((r) =>
+      r.ok ? r.text() : "",
+    ),
+    fetch(`${base}/ind_nifty50list.csv`, { headers: { "User-Agent": UA } }).then((r) =>
+      r.ok ? r.text() : "",
+    ),
+  ]);
+  const map = new Map<string, Constituent>();
+  if (n500) addCsvToMap(n500, map, "in500");
+  if (n50) addCsvToMap(n50, map, "in50");
+  return map;
+}
+
+function enrichEvent(e: CorporateEvent, map: Map<string, Constituent>): CorporateEvent {
+  const c = map.get(e.ticker);
+  if (c) {
+    e.indices = c.in50 ? ["NIFTY50", "NIFTY500"] : c.in500 ? ["NIFTY500"] : [];
+    if (c.sector) e.sector = c.sector;
+  }
+  return e;
+}
+
 function nseDate(d: Date): string {
   const dd = String(d.getDate()).padStart(2, "0");
   const mm = String(d.getMonth() + 1).padStart(2, "0");
@@ -279,7 +328,8 @@ async function buildLiveResult() {
   const from = new Date(now);
   from.setDate(from.getDate() - 4);
 
-  const [settled, concalls] = await Promise.all([
+  const [constituents, settled, concalls] = await Promise.all([
+    fetchConstituents().catch(() => new Map<string, Constituent>()),
     Promise.allSettled([
       bseJson("/Corpforthresults/w").then(parseBseForthResults),
       nseJson(
@@ -313,8 +363,9 @@ async function buildLiveResult() {
   });
   if (concalls.length) sources.nse = true;
 
+  const enriched = all.map((e) => enrichEvent(e, constituents));
   const today = todayISO();
-  const events = dedupe(all)
+  const events = dedupe(enriched)
     .filter((e) => e.date >= today)
     .sort((a, b) => a.date.localeCompare(b.date) || a.company.localeCompare(b.company));
 

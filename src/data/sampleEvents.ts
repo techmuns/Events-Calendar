@@ -95,10 +95,10 @@ export function buildSampleEvents(): CorporateEvent[] {
 const SAMPLE_CONCALLS: Array<{ company: string; ticker: string; summary: string; offset: number; exchange: Exchange }> = [
   { company: "Tata Consultancy Services", ticker: "TCS", summary: "Earnings Conference Call", offset: 0, exchange: "NSE" },
   { company: "Infosys", ticker: "INFY", summary: "Investor & Analyst Conference Call", offset: 0, exchange: "NSE" },
-  { company: "HDFC Bank", ticker: "HDFCBANK", summary: "Schedule of Analyst / Investor Meet", offset: 0, exchange: "BSE" },
+  { company: "HDFC Bank", ticker: "HDFCBANK", summary: "Schedule of Analyst / Investor Meet", offset: 0, exchange: "NSE" },
   { company: "Reliance Industries", ticker: "RELIANCE", summary: "Earnings Call intimation", offset: -1, exchange: "NSE" },
   { company: "Maruti Suzuki India", ticker: "MARUTI", summary: "Investor Conference Call", offset: -1, exchange: "NSE" },
-  { company: "Persistent Systems", ticker: "PERSISTENT", summary: "Q1 FY27 Earnings Call", offset: -2, exchange: "BSE" },
+  { company: "Persistent Systems", ticker: "PERSISTENT", summary: "Q1 FY27 Earnings Call", offset: -2, exchange: "NSE" },
 ];
 
 export function buildSampleConcalls(): ConcallItem[] {

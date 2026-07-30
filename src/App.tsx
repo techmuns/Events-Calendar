@@ -242,7 +242,7 @@ export default function App() {
           {result && filters.types.includes("CONCALL") && (
             <WidgetCard
               title="Recently announced concalls"
-              subtitle="Analyst / investor call intimations — from BSE &amp; NSE filings"
+              subtitle="Analyst / investor call intimations — NSE filings (SEBI Reg 30)"
             >
               <ConcallsPanel concalls={result.concalls} />
             </WidgetCard>
