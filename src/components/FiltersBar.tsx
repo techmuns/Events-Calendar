@@ -61,9 +61,11 @@ function Segmented<T extends string | number>({
 export function FiltersBar({
   filters,
   onChange,
+  counts,
 }: {
   filters: Filters;
   onChange: (f: Filters) => void;
+  counts?: Partial<Record<EventType, number>>;
 }) {
   const toggleType = (t: EventType) => {
     const has = filters.types.includes(t);
@@ -117,6 +119,9 @@ export function FiltersBar({
                 }}
               >
                 {m.label}
+                {counts?.[t] !== undefined && (
+                  <span style={{ marginLeft: 5, fontWeight: 700, opacity: 0.7 }}>{counts[t]}</span>
+                )}
               </button>
             );
           })}

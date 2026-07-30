@@ -1,10 +1,11 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import type { CSSProperties } from "react";
-import type { CorporateEvent, Filters } from "./types";
+import type { CorporateEvent, EventType, Filters } from "./types";
 import { tokens } from "./theme";
 import { useEvents } from "./hooks/useEvents";
 import { useHostContext } from "./hooks/useHostContext";
 import { applyFilters } from "./lib/filter";
+import { addDays, formatDate, parseISO, toISO } from "./lib/dates";
 import { FiltersBar } from "./components/FiltersBar";
 import { KpiRow } from "./components/KpiRow";
 import { AgendaView } from "./components/AgendaView";
@@ -81,12 +82,32 @@ export default function App() {
   const { isDark, toggle } = useTheme();
   const watchlist = useWatchlist();
   const [selected, setSelected] = useState<CorporateEvent | null>(null);
+  const [focusWeek, setFocusWeek] = useState<string | null>(null);
 
-  const filtered = result ? applyFilters(result.events, filters, watchlist.set) : [];
+  const baseFiltered = result ? applyFilters(result.events, filters, watchlist.set) : [];
+  const filtered = focusWeek
+    ? baseFiltered.filter(
+        (e) => e.date >= focusWeek && e.date <= toISO(addDays(parseISO(focusWeek), 6)),
+      )
+    : baseFiltered;
   const diffs = useEventDiff(result?.events ?? []);
   let newCount = 0;
   let revCount = 0;
   diffs.forEach((d) => (d.isNew ? newCount++ : d.isRevised ? revCount++ : null));
+
+  const typeCounts = useMemo(() => {
+    const c: Record<EventType, number> = { EARNINGS: 0, CONCALL: 0, DEMERGER: 0 };
+    if (!result) return c;
+    const all = applyFilters(
+      result.events,
+      { ...filters, types: ["EARNINGS", "CONCALL", "DEMERGER"] },
+      watchlist.set,
+    );
+    for (const e of all) c[e.eventType]++;
+    c.CONCALL = result.concalls.length;
+    return c;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [result, filters.universe, filters.horizonDays, filters.search, watchlist.set]);
 
   const shell: CSSProperties = {
     display: "flex",
@@ -196,7 +217,7 @@ export default function App() {
         style={{ flex: 1, overflow: "auto", padding: "24px 32px" }}
       >
         <div style={{ display: "flex", flexDirection: "column", gap: 20, maxWidth: 1280, margin: "0 auto" }}>
-          <FiltersBar filters={filters} onChange={setFilters} />
+          <FiltersBar filters={filters} onChange={setFilters} counts={typeCounts} />
 
           {result ? (
             <KpiRow events={filtered} generatedAt={result.generatedAt} live={result.live} />
@@ -204,9 +225,9 @@ export default function App() {
             <KpiShimmer />
           )}
 
-          {result && filtered.length > 0 && (
-            <WidgetCard title="Earnings-season density" subtitle="Upcoming event volume by week">
-              <Heatmap events={filtered} />
+          {result && baseFiltered.length > 0 && (
+            <WidgetCard title="Earnings-season density" subtitle="Upcoming event volume by week — click a week to filter">
+              <Heatmap events={baseFiltered} selectedWeek={focusWeek} onSelectWeek={setFocusWeek} />
             </WidgetCard>
           )}
 
@@ -220,6 +241,25 @@ export default function App() {
                       : ""
                   }`
                 : "Loading events…"
+            }
+            right={
+              focusWeek ? (
+                <button
+                  onClick={() => setFocusWeek(null)}
+                  style={{
+                    cursor: "pointer",
+                    border: `1px solid ${tokens.primaryBorder}`,
+                    background: tokens.primaryLight,
+                    color: tokens.primaryText,
+                    borderRadius: 99,
+                    fontSize: 11.5,
+                    fontWeight: 600,
+                    padding: "3px 10px",
+                  }}
+                >
+                  Week of {formatDate(focusWeek)} ✕
+                </button>
+              ) : undefined
             }
           >
             {error ? (
