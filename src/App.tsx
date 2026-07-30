@@ -11,12 +11,10 @@ import { KpiRow } from "./components/KpiRow";
 import { AgendaView } from "./components/AgendaView";
 import { MonthView } from "./components/MonthView";
 import { DetailTable } from "./components/DetailTable";
-import { SourcesWidget } from "./components/SourcesWidget";
 import { WidgetCard } from "./components/WidgetCard";
 import { ErrorState, ShimmerRows } from "./components/states";
 import { Heatmap } from "./components/Heatmap";
-import { EventDrawer } from "./components/EventDrawer";
-import { ConcallsPanel } from "./components/ConcallsPanel";
+import { DetailPanel, type DetailTab } from "./components/DetailPanel";
 import { useTheme } from "./hooks/useTheme";
 import { useWatchlist } from "./hooks/useWatchlist";
 import { useEventDiff } from "./hooks/useEventDiff";
@@ -29,13 +27,13 @@ const DEFAULT_FILTERS: Filters = {
   search: "",
 };
 
-type View = "agenda" | "month";
+type View = "agenda" | "month" | "table";
 
 function KpiShimmer() {
   return (
-    <div style={{ display: "grid", gap: 16, gridTemplateColumns: "repeat(auto-fit, minmax(190px, 1fr))" }}>
+    <div style={{ display: "grid", gap: 14, gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))" }}>
       {Array.from({ length: 4 }).map((_, i) => (
-        <div key={i} className="shimmer" style={{ height: 82, borderRadius: 14 }} />
+        <div key={i} className="shimmer" style={{ height: 76, borderRadius: 14 }} />
       ))}
     </div>
   );
@@ -45,6 +43,7 @@ function ViewToggle({ view, onChange }: { view: View; onChange: (v: View) => voi
   const opts: { key: View; label: string }[] = [
     { key: "agenda", label: "Agenda" },
     { key: "month", label: "Month" },
+    { key: "table", label: "Table" },
   ];
   return (
     <div style={{ display: "inline-flex", background: tokens.surface2, borderRadius: 8, padding: 2 }}>
@@ -82,7 +81,13 @@ export default function App() {
   const { isDark, toggle } = useTheme();
   const watchlist = useWatchlist();
   const [selected, setSelected] = useState<CorporateEvent | null>(null);
+  const [rightTab, setRightTab] = useState<DetailTab>("concalls");
   const [focusWeek, setFocusWeek] = useState<string | null>(null);
+
+  const selectEvent = (e: CorporateEvent) => {
+    setSelected(e);
+    setRightTab("details");
+  };
 
   const baseFiltered = result ? applyFilters(result.events, filters, watchlist.set) : [];
   const filtered = focusWeek
@@ -130,6 +135,13 @@ export default function App() {
     color: tokens.textSecondary,
   };
 
+  const listTitle = view === "month" ? "Calendar" : view === "table" ? "All events" : "Upcoming events";
+  const listSubtitle = result
+    ? `${filtered.length} events · next ${filters.horizonDays} days${
+        newCount || revCount ? ` · ${newCount} new, ${revCount} rescheduled` : ""
+      }`
+    : "Loading events…";
+
   return (
     <div style={shell}>
       <header
@@ -140,7 +152,7 @@ export default function App() {
           display: "flex",
           alignItems: "center",
           justifyContent: "space-between",
-          padding: "0 24px",
+          padding: "0 20px",
           height: 48,
           background: tokens.cardHeaderBg,
           backdropFilter: "blur(8px)",
@@ -211,101 +223,83 @@ export default function App() {
         </div>
       </header>
 
-      <main
-        id="dashboard-main"
-        data-dashboard-capture-root="true"
-        style={{ flex: 1, overflow: "auto", padding: "24px 32px" }}
-      >
-        <div style={{ display: "flex", flexDirection: "column", gap: 20, maxWidth: 1280, margin: "0 auto" }}>
-          <FiltersBar filters={filters} onChange={setFilters} counts={typeCounts} />
+      <main id="dashboard-main" data-dashboard-capture-root="true" className="dash-main">
+        <FiltersBar filters={filters} onChange={setFilters} counts={typeCounts} />
 
-          {result ? (
-            <KpiRow events={filtered} generatedAt={result.generatedAt} live={result.live} />
-          ) : (
-            <KpiShimmer />
-          )}
+        {result ? (
+          <KpiRow events={baseFiltered} generatedAt={result.generatedAt} live={result.live} />
+        ) : (
+          <KpiShimmer />
+        )}
 
-          {result && baseFiltered.length > 0 && (
-            <WidgetCard title="Earnings-season density" subtitle="Upcoming event volume by week — click a week to filter">
-              <Heatmap events={baseFiltered} selectedWeek={focusWeek} onSelectWeek={setFocusWeek} />
-            </WidgetCard>
-          )}
-
-          <WidgetCard
-            title={view === "agenda" ? "Upcoming events" : "Calendar"}
-            subtitle={
-              result
-                ? `${filtered.length} events · next ${filters.horizonDays} days${
-                    newCount || revCount
-                      ? ` · ${newCount} new, ${revCount} rescheduled since last visit`
-                      : ""
-                  }`
-                : "Loading events…"
-            }
-            right={
-              focusWeek ? (
-                <button
-                  onClick={() => setFocusWeek(null)}
-                  style={{
-                    cursor: "pointer",
-                    border: `1px solid ${tokens.primaryBorder}`,
-                    background: tokens.primaryLight,
-                    color: tokens.primaryText,
-                    borderRadius: 99,
-                    fontSize: 11.5,
-                    fontWeight: 600,
-                    padding: "3px 10px",
-                  }}
-                >
-                  Week of {formatDate(focusWeek)} ✕
-                </button>
-              ) : undefined
-            }
-          >
-            {error ? (
-              <ErrorState message={error} />
-            ) : !result ? (
-              <ShimmerRows rows={6} />
-            ) : view === "agenda" ? (
-              <AgendaView
-                events={filtered}
-                diffs={diffs}
-                onSelect={setSelected}
-                isStarred={watchlist.has}
-                onToggleStar={watchlist.toggle}
-              />
-            ) : (
-              <MonthView events={filtered} onSelect={setSelected} />
-            )}
+        {result && baseFiltered.length > 0 && (
+          <WidgetCard title="Earnings-season density" subtitle="Event volume by week — click a week to filter">
+            <Heatmap events={baseFiltered} selectedWeek={focusWeek} onSelectWeek={setFocusWeek} />
           </WidgetCard>
+        )}
 
-          {result && filters.types.includes("CONCALL") && (
+        <div className="workspace">
+          <div className="pane pane-left">
             <WidgetCard
-              title="Recently announced concalls"
-              subtitle="Analyst / investor call intimations — NSE filings (SEBI Reg 30)"
+              title={listTitle}
+              subtitle={listSubtitle}
+              fill
+              right={
+                focusWeek ? (
+                  <button
+                    onClick={() => setFocusWeek(null)}
+                    style={{
+                      cursor: "pointer",
+                      border: `1px solid ${tokens.primaryBorder}`,
+                      background: tokens.primaryLight,
+                      color: tokens.primaryText,
+                      borderRadius: 99,
+                      fontSize: 11.5,
+                      fontWeight: 600,
+                      padding: "3px 10px",
+                    }}
+                  >
+                    Week of {formatDate(focusWeek)} ✕
+                  </button>
+                ) : undefined
+              }
             >
-              <ConcallsPanel concalls={result.concalls} />
+              {error ? (
+                <ErrorState message={error} />
+              ) : !result ? (
+                <ShimmerRows rows={6} />
+              ) : view === "agenda" ? (
+                <AgendaView
+                  events={filtered}
+                  diffs={diffs}
+                  onSelect={selectEvent}
+                  isStarred={watchlist.has}
+                  onToggleStar={watchlist.toggle}
+                />
+              ) : view === "month" ? (
+                <MonthView events={filtered} onSelect={selectEvent} />
+              ) : (
+                <DetailTable events={filtered} onSelect={selectEvent} />
+              )}
             </WidgetCard>
-          )}
+          </div>
 
-          <WidgetCard title="All events" subtitle="Sortable — click a column header">
-            {!result ? <ShimmerRows rows={4} /> : <DetailTable events={filtered} onSelect={setSelected} />}
-          </WidgetCard>
-
-          <WidgetCard title="Sources & freshness">
-            {!result ? <ShimmerRows rows={3} /> : <SourcesWidget result={result} />}
-          </WidgetCard>
+          <div className="pane pane-right">
+            <DetailPanel
+              selected={selected}
+              allEvents={result?.events ?? []}
+              concalls={result?.concalls ?? []}
+              showConcalls={filters.types.includes("CONCALL")}
+              tab={rightTab}
+              onTab={setRightTab}
+              onSelect={selectEvent}
+              isStarred={watchlist.has}
+              onToggleStar={watchlist.toggle}
+              source={result?.source ?? "BSE + NSE"}
+            />
+          </div>
         </div>
       </main>
-
-      <EventDrawer
-        event={selected}
-        allEvents={result?.events ?? []}
-        onClose={() => setSelected(null)}
-        onSelect={setSelected}
-        isStarred={watchlist.has}
-        onToggleStar={watchlist.toggle}
-      />
     </div>
   );
 }

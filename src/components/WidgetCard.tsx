@@ -8,6 +8,7 @@ export function WidgetCard({
   children,
   span,
   bodyStyle,
+  fill,
 }: {
   title: string;
   subtitle?: string;
@@ -15,6 +16,7 @@ export function WidgetCard({
   children: ReactNode;
   span?: boolean;
   bodyStyle?: CSSProperties;
+  fill?: boolean;
 }) {
   const card: CSSProperties = {
     background: tokens.cardBg,
@@ -25,11 +27,12 @@ export function WidgetCard({
     flexDirection: "column",
     backdropFilter: "blur(8px)",
     boxShadow: "0 1px 4px rgba(0,0,0,0.04)",
-    transition: "all 0.35s cubic-bezier(0.4, 0, 0.2, 1)",
+    transition: "border-color 0.35s, box-shadow 0.35s",
     gridColumn: span ? "1 / -1" : undefined,
+    ...(fill ? { flex: 1, minHeight: 0, height: "100%" } : {}),
   };
   return (
-    <div className="widget-card" style={card}>
+    <div className={fill ? "" : "widget-card"} style={card}>
       <div
         style={{
           display: "flex",
@@ -53,7 +56,16 @@ export function WidgetCard({
         </div>
         {right}
       </div>
-      <div style={{ flex: 1, position: "relative", background: tokens.cardBodyBg, ...bodyStyle }}>
+      <div
+        style={{
+          flex: 1,
+          minHeight: 0,
+          position: "relative",
+          background: tokens.cardBodyBg,
+          overflow: fill ? "auto" : undefined,
+          ...bodyStyle,
+        }}
+      >
         {children}
       </div>
     </div>

@@ -67,7 +67,7 @@ export function DetailTable({
   };
 
   return (
-    <div style={{ maxHeight: 420, overflow: "auto" }}>
+    <div>
       <table style={{ width: "100%", borderCollapse: "collapse", fontFamily: tokens.font }}>
         <thead>
           <tr>
