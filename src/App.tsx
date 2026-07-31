@@ -13,7 +13,7 @@ import { MonthView } from "./components/MonthView";
 import { DetailTable } from "./components/DetailTable";
 import { WidgetCard } from "./components/WidgetCard";
 import { ErrorState, ShimmerRows } from "./components/states";
-import { Heatmap } from "./components/Heatmap";
+import { DensityCard } from "./components/DensityCard";
 import { DetailPanel } from "./components/DetailPanel";
 import { useTheme } from "./hooks/useTheme";
 import { useWatchlist } from "./hooks/useWatchlist";
@@ -226,9 +226,7 @@ export default function App() {
         )}
 
         {result && baseFiltered.length > 0 && (
-          <WidgetCard title="Earnings-season density" subtitle="Events per day — click a day to filter">
-            <Heatmap events={baseFiltered} selectedDay={focusDay} onSelectDay={setFocusDay} />
-          </WidgetCard>
+          <DensityCard events={baseFiltered} selectedDay={focusDay} onSelectDay={setFocusDay} />
         )}
 
         <div className="workspace">

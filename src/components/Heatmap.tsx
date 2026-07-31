@@ -12,7 +12,7 @@ const MIN_DAYS = 21;
 const MAX_DAYS = 60;
 const BAR_AREA = 92; // px, tallest bar
 
-interface Day {
+export interface Day {
   date: Date;
   iso: string;
   count: number;
@@ -21,19 +21,13 @@ interface Day {
   weekend: boolean;
 }
 
-function dayLabel(d: Date): string {
+export function dayLabel(d: Date): string {
   return `${WEEKDAYS[d.getDay()]} ${d.getDate()} ${MONTHS[d.getMonth()]}`;
 }
 
-export function Heatmap({
-  events,
-  selectedDay,
-  onSelectDay,
-}: {
-  events: CorporateEvent[];
-  selectedDay?: string | null;
-  onSelectDay?: (dayISO: string | null) => void;
-}) {
+// Daily buckets over an adaptive window (today → last event, clamped), plus the
+// peak and the busiest days. Shared by the full chart and its collapsed summary.
+export function computeDensity(events: CorporateEvent[]): { days: Day[]; max: number; busiest: Day[] } {
   const today = todayStart();
 
   let lastOffset = 0;
@@ -59,11 +53,25 @@ export function Heatmap({
   }
 
   const max = Math.max(1, ...days.map((d) => d.count));
-  const valThreshold = Math.max(10, max * 0.3);
   const busiest = days
     .filter((d) => d.count > 0)
     .sort((a, b) => b.count - a.count || a.iso.localeCompare(b.iso))
     .slice(0, 5);
+
+  return { days, max, busiest };
+}
+
+export function Heatmap({
+  events,
+  selectedDay,
+  onSelectDay,
+}: {
+  events: CorporateEvent[];
+  selectedDay?: string | null;
+  onSelectDay?: (dayISO: string | null) => void;
+}) {
+  const { days, max, busiest } = computeDensity(events);
+  const valThreshold = Math.max(10, max * 0.3);
 
   const barColor = (d: Day): string => {
     if (d.count === 0) return `color-mix(in srgb, ${tokens.textHint} 12%, transparent)`;

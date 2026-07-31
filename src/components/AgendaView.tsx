@@ -2,7 +2,7 @@ import type { CSSProperties } from "react";
 import type { CorporateEvent } from "../types";
 import type { EventDiff } from "../hooks/useEventDiff";
 import { tokens } from "../theme";
-import { ChangeBadge, EventTypeChip, StatusBadge, ExchangePill } from "./badges";
+import { ChangeBadge, EventTypeChip } from "./badges";
 import { EmptyState } from "./states";
 import { ExternalLinkIcon, StarIcon } from "./icons";
 import { type Bucket, bucketFor, formatDate, parseISO, todayStart } from "../lib/dates";
@@ -87,9 +87,7 @@ function EventRow({
       <div style={{ display: "flex", alignItems: "center", gap: 6, flexShrink: 0 }}>
         {diff?.isNew && <ChangeBadge kind="new" />}
         {diff?.isRevised && <ChangeBadge kind="moved" />}
-        <EventTypeChip type={e.eventType} />
-        <StatusBadge status={e.status} />
-        <ExchangePill exchange={e.exchange} />
+        {e.eventType !== "EARNINGS" && <EventTypeChip type={e.eventType} />}
         {e.sourceUrl && (
           <a
             href={e.sourceUrl}
