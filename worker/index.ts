@@ -47,6 +47,15 @@ interface ConcallItem {
   sourceUrl?: string;
 }
 
+type FilingCategory = "PRESS" | "MEET" | "PRESENTATION" | "CONCALL" | "SCHEME";
+
+interface CompanyFiling {
+  category: FilingCategory;
+  title: string;
+  date: string;
+  url: string;
+}
+
 const NSE = "https://www.nseindia.com";
 const BSE_API = "https://api.bseindia.com/BseIndiaAPI/api";
 const UA =
@@ -92,16 +101,30 @@ function cleanName(s: string): string {
   return (s ?? "").replace(/-\$?\s*$/, "").trim();
 }
 
+// NSE's JSON APIs reject requests without the cookies its web pages set. Visit
+// the landing page and the filings page so we collect the full set (deduped by
+// name — later pages refresh earlier cookies).
 async function nseCookie(): Promise<string> {
-  try {
-    const res = await fetch(`${NSE}/`, {
-      headers: { "User-Agent": UA, Accept: "text/html,application/xhtml+xml" },
-    });
-    const jar = res.headers.getSetCookie?.() ?? [];
-    return jar.map((c) => c.split(";")[0]).join("; ");
-  } catch {
-    return "";
+  const jar = new Map<string, string>();
+  for (const path of ["/", "/companies-listing/corporate-filings-announcements"]) {
+    try {
+      const res = await fetch(`${NSE}${path}`, {
+        headers: {
+          "User-Agent": UA,
+          Accept: "text/html,application/xhtml+xml",
+          "Accept-Language": "en-US,en;q=0.9",
+        },
+      });
+      for (const c of res.headers.getSetCookie?.() ?? []) {
+        const kv = c.split(";")[0];
+        const eq = kv.indexOf("=");
+        if (eq > 0) jar.set(kv.slice(0, eq).trim(), kv.slice(eq + 1).trim());
+      }
+    } catch {
+      /* ignore — a partial jar may still work */
+    }
   }
+  return [...jar.entries()].map(([k, v]) => `${k}=${v}`).join("; ");
 }
 
 async function nseJson(path: string, referer: string, cookie: string): Promise<unknown> {
@@ -322,6 +345,88 @@ function parseNseConcalls(data: unknown): ConcallItem[] {
   return out.slice(0, 40);
 }
 
+// ---- Per-company filings (Details tab) --------------------------------------
+// NSE announcements carry a category (`desc`) and a body (`attchmntText`); we
+// sort each into the buckets the desk cares about and keep the direct PDF link.
+
+// NSE datetimes are "2026-07-30 15:30:00"; fall back to the "29-Jul-2026" parser.
+function anyDate(s: string): string | null {
+  const iso = /^(\d{4})-(\d{2})-(\d{2})/.exec(s ?? "");
+  if (iso) return `${iso[1]}-${iso[2]}-${iso[3]}`;
+  return isoDate(s ?? "");
+}
+
+function categorizeFiling(desc: string, text: string): FilingCategory | null {
+  const d = (desc ?? "").toLowerCase();
+  const t = (text ?? "").toLowerCase();
+  const s = `${d} ${t}`;
+  if (/scheme of arrangement|de-?merg|spin-?off|composite scheme|hive-?off|slump sale/.test(s)) return "SCHEME";
+  if (/presentation/.test(s)) return "PRESENTATION";
+  // NSE bundles meets + calls under one `desc`; trust the body to spot a call.
+  if (/con\.? ?call|conference call|earnings call|analyst call|investor call|dial-?in|audio call|webcast/.test(t))
+    return "CONCALL";
+  if (/investor meet|analyst|institutional investor|con\.? ?call|investor call/.test(s)) return "MEET";
+  if (/press release|media release|press note/.test(s)) return "PRESS";
+  return null;
+}
+
+function filingTitle(text: string, desc: string): string {
+  let t = (text ?? "").replace(/\s+/g, " ").trim();
+  // Strip the boilerplate "<Company> has informed the Exchange about ..." lead.
+  t = t.replace(/^.*?informed the exchange\s*(?:about|regarding|that|of)?\s*/i, "");
+  t = t.replace(/^['"\s:;,.-]+/, "").trim();
+  const base = t || (desc ?? "").replace(/\s+/g, " ").trim() || "Filing";
+  const label = base.charAt(0).toUpperCase() + base.slice(1);
+  return label.slice(0, 90);
+}
+
+function parseCompanyFilings(data: unknown): CompanyFiling[] {
+  if (!Array.isArray(data)) return [];
+  const out: CompanyFiling[] = [];
+  const seen = new Set<string>();
+  for (const r of data as Array<Record<string, string>>) {
+    const cat = categorizeFiling(r.desc ?? "", r.attchmntText ?? "");
+    if (!cat) continue;
+    const url = (r.attchmntFile ?? "").trim();
+    if (!url || seen.has(url)) continue;
+    const date = anyDate(r.an_dt) ?? anyDate(r.sort_date ?? "");
+    if (!date) continue;
+    seen.add(url);
+    out.push({ category: cat, title: filingTitle(r.attchmntText ?? "", r.desc ?? ""), date, url });
+  }
+  out.sort((a, b) => b.date.localeCompare(a.date));
+  return out.slice(0, 40);
+}
+
+async function buildCompanyFilings(symbol: string) {
+  const sym = symbol.toUpperCase().trim();
+  const now = new Date();
+  const from = new Date(now);
+  from.setDate(from.getDate() - 150);
+  const path = `/api/corporate-announcements?index=equities&symbol=${encodeURIComponent(sym)}&from_date=${nseDate(
+    from,
+  )}&to_date=${nseDate(now)}`;
+  // The symbol's own quote page is the referer NSE expects for a symbol query.
+  const referer = `${NSE}/get-quotes/equity?symbol=${encodeURIComponent(sym)}`;
+
+  // NSE intermittently blocks bursts, sometimes by erroring and sometimes by
+  // returning an empty 200. Retry with a fresh cookie until we get rows or run
+  // out of attempts; `reached` tracks whether NSE actually answered.
+  let filings: CompanyFiling[] = [];
+  let reached = false;
+  for (let attempt = 0; attempt < 3 && filings.length === 0; attempt++) {
+    try {
+      const cookie = await nseCookie();
+      const data = await nseJson(path, referer, cookie);
+      reached = true;
+      filings = parseCompanyFilings(data);
+    } catch {
+      /* transient — try again with a fresh cookie */
+    }
+  }
+  return { symbol: sym, filings, generatedAt: new Date().toISOString(), source: "NSE", ok: reached };
+}
+
 async function buildLiveResult() {
   const cookie = await nseCookie();
   const now = new Date();
@@ -379,6 +484,25 @@ async function buildLiveResult() {
   };
 }
 
+// Edge-cached JSON keyed by full URL (so ?symbol= variants cache separately).
+async function cachedJson(request: Request, ctx: Ctx, build: () => Promise<unknown>): Promise<Response> {
+  const cache = caches.default;
+  const cacheKey = new Request(new URL(request.url).toString(), { method: "GET" });
+  const cached = await cache.match(cacheKey);
+  if (cached) return cached;
+  let body: unknown;
+  try {
+    body = await build();
+  } catch (err) {
+    body = { error: err instanceof Error ? err.message : "fetch failed" };
+  }
+  const res = new Response(JSON.stringify(body), {
+    headers: { "Content-Type": "application/json", "Cache-Control": `public, max-age=${CACHE_SECONDS}` },
+  });
+  ctx.waitUntil(cache.put(cacheKey, res.clone()));
+  return res;
+}
+
 async function handleApi(request: Request, ctx: Ctx): Promise<Response> {
   const cache = caches.default;
   const cacheKey = new Request(new URL(request.url).toString(), { method: "GET" });
@@ -413,6 +537,16 @@ export default {
   async fetch(request: Request, env: Env, ctx: Ctx): Promise<Response> {
     const url = new URL(request.url);
     if (url.pathname === "/api/corporate-calendar") return handleApi(request, ctx);
+    if (url.pathname === "/api/company-filings") {
+      const symbol = url.searchParams.get("symbol") ?? "";
+      if (!symbol.trim()) {
+        return new Response(
+          JSON.stringify({ symbol: "", filings: [], generatedAt: new Date().toISOString(), source: "NSE" }),
+          { headers: { "Content-Type": "application/json" } },
+        );
+      }
+      return cachedJson(request, ctx, () => buildCompanyFilings(symbol));
+    }
     if (url.pathname === "/api/health") {
       return new Response(JSON.stringify({ ok: true }), {
         headers: { "Content-Type": "application/json" },

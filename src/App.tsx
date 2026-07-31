@@ -5,7 +5,7 @@ import { tokens } from "./theme";
 import { useEvents } from "./hooks/useEvents";
 import { useHostContext } from "./hooks/useHostContext";
 import { applyFilters } from "./lib/filter";
-import { addDays, formatDate, parseISO, toISO } from "./lib/dates";
+import { formatDate } from "./lib/dates";
 import { FiltersBar } from "./components/FiltersBar";
 import { KpiRow } from "./components/KpiRow";
 import { AgendaView } from "./components/AgendaView";
@@ -82,7 +82,7 @@ export default function App() {
   const watchlist = useWatchlist();
   const [selected, setSelected] = useState<CorporateEvent | null>(null);
   const [rightTab, setRightTab] = useState<DetailTab>("concalls");
-  const [focusWeek, setFocusWeek] = useState<string | null>(null);
+  const [focusDay, setFocusDay] = useState<string | null>(null);
 
   const selectEvent = (e: CorporateEvent) => {
     setSelected(e);
@@ -90,11 +90,7 @@ export default function App() {
   };
 
   const baseFiltered = result ? applyFilters(result.events, filters, watchlist.set) : [];
-  const filtered = focusWeek
-    ? baseFiltered.filter(
-        (e) => e.date >= focusWeek && e.date <= toISO(addDays(parseISO(focusWeek), 6)),
-      )
-    : baseFiltered;
+  const filtered = focusDay ? baseFiltered.filter((e) => e.date === focusDay) : baseFiltered;
   const diffs = useEventDiff(result?.events ?? []);
   let newCount = 0;
   let revCount = 0;
@@ -233,8 +229,8 @@ export default function App() {
         )}
 
         {result && baseFiltered.length > 0 && (
-          <WidgetCard title="Earnings-season density" subtitle="Event volume by week — click a week to filter">
-            <Heatmap events={baseFiltered} selectedWeek={focusWeek} onSelectWeek={setFocusWeek} />
+          <WidgetCard title="Earnings-season density" subtitle="Events per day — click a day to filter">
+            <Heatmap events={baseFiltered} selectedDay={focusDay} onSelectDay={setFocusDay} />
           </WidgetCard>
         )}
 
@@ -245,9 +241,9 @@ export default function App() {
               subtitle={listSubtitle}
               fill
               right={
-                focusWeek ? (
+                focusDay ? (
                   <button
-                    onClick={() => setFocusWeek(null)}
+                    onClick={() => setFocusDay(null)}
                     style={{
                       cursor: "pointer",
                       border: `1px solid ${tokens.primaryBorder}`,
@@ -259,7 +255,7 @@ export default function App() {
                       padding: "3px 10px",
                     }}
                   >
-                    Week of {formatDate(focusWeek)} ✕
+                    {formatDate(focusDay)} ✕
                   </button>
                 ) : undefined
               }

@@ -48,6 +48,27 @@ export interface EventsResult {
   live: boolean; // false for the seed data, true once wired to the feed
 }
 
+// ---- Per-company filings (Details tab) ----
+// Recent exchange filings for one company, segregated by kind, each with a
+// direct PDF link. Populated on demand when a company's event is opened.
+
+export type FilingCategory = "PRESS" | "MEET" | "PRESENTATION" | "CONCALL" | "SCHEME";
+
+export interface CompanyFiling {
+  category: FilingCategory;
+  title: string; // short human label from the filing
+  date: string; // ISO date filed
+  url: string; // direct link to the PDF on the exchange
+}
+
+export interface CompanyFilingsResult {
+  symbol: string;
+  filings: CompanyFiling[];
+  generatedAt: string;
+  source: string;
+  ok?: boolean; // false when the exchange fetch failed (vs. genuinely no filings)
+}
+
 // ---- Filter state shared across the dashboard ----
 
 export type Universe = "ALL" | "NIFTY50" | "NIFTY500" | "WATCHLIST";

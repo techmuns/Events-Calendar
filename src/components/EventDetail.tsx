@@ -1,6 +1,7 @@
 import type { CorporateEvent } from "../types";
 import { tokens } from "../theme";
-import { EventTypeChip, StatusBadge, ExchangePill } from "./badges";
+import { EventTypeChip } from "./badges";
+import { CompanyFilings } from "./CompanyFilings";
 import { DownloadIcon, ExternalLinkIcon, StarIcon } from "./icons";
 import { parseISO } from "../lib/dates";
 import { downloadIcs } from "../lib/ics";
@@ -64,13 +65,7 @@ export function EventDetail({
         {event.isin ? ` · ${event.isin}` : ""}
       </div>
 
-      <div style={{ display: "flex", gap: 6, flexWrap: "wrap", margin: "12px 0" }}>
-        <EventTypeChip type={event.eventType} />
-        <StatusBadge status={event.status} />
-        <ExchangePill exchange={event.exchange} />
-      </div>
-
-      <div style={{ fontSize: 15, fontWeight: 700, color: tokens.textPrimary }}>{event.subtype}</div>
+      <div style={{ fontSize: 15, fontWeight: 700, color: tokens.textPrimary, marginTop: 16 }}>{event.subtype}</div>
       <div style={{ fontSize: 13.5, color: tokens.primaryText, marginTop: 4 }}>{longDate(event.date)}</div>
 
       <div style={{ display: "flex", gap: 8, margin: "16px 0" }}>
@@ -87,8 +82,7 @@ export function EventDetail({
 
       <div>
         {event.time && <Field label="Time" value={event.time} />}
-        <Field label="Status" value={event.status} />
-        <Field label="Exchange" value={event.exchange} />
+        <Field label="Source" value={event.exchange} />
         {event.sector && <Field label="Sector" value={event.sector} />}
         {event.indices.length > 0 && <Field label="Index" value={event.indices.join(", ")} />}
       </div>
@@ -103,6 +97,8 @@ export function EventDetail({
           View exchange filing <ExternalLinkIcon size={13} />
         </a>
       )}
+
+      <CompanyFilings ticker={event.ticker} />
 
       {others.length > 0 && (
         <div style={{ marginTop: 22 }}>

@@ -2,7 +2,7 @@
 // EventsProvider, so moving from sample data to the live NSE/BSE feed is a
 // one-line swap of `eventsProvider` below — no component changes.
 
-import type { EventsResult } from "../types";
+import type { CompanyFilingsResult, EventsResult } from "../types";
 import { buildSampleConcalls, buildSampleEvents } from "./sampleEvents";
 
 export interface EventsProvider {
@@ -48,3 +48,19 @@ export const eventsProvider: EventsProvider = {
     }
   },
 };
+
+// Per-company filings, fetched on demand when a company is opened in Details.
+// Results are memoised per symbol for the session so re-opening is instant.
+const filingsCache = new Map<string, CompanyFilingsResult>();
+
+export async function getCompanyFilings(symbol: string): Promise<CompanyFilingsResult> {
+  const sym = symbol.trim().toUpperCase();
+  const cached = filingsCache.get(sym);
+  if (cached) return cached;
+  const res = await fetch(`/api/company-filings?symbol=${encodeURIComponent(sym)}`);
+  if (!res.ok) throw new Error(`Filings unavailable (HTTP ${res.status})`);
+  const data = (await res.json()) as CompanyFilingsResult;
+  const normalised: CompanyFilingsResult = { ...data, filings: data.filings ?? [] };
+  filingsCache.set(sym, normalised);
+  return normalised;
+}
