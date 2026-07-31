@@ -23,19 +23,23 @@ function KpiCard({
   value,
   sub,
   accent,
+  bg,
+  bd,
   Icon,
 }: {
   label: string;
   value: string;
   sub: string;
   accent: string;
+  bg: string;
+  bd: string;
   Icon: IconCmp;
 }) {
   const card: CSSProperties = {
     position: "relative",
     overflow: "hidden",
-    background: tokens.cardBg,
-    border: `1px solid ${tokens.border}`,
+    background: bg,
+    border: `1px solid ${bd}`,
     borderRadius: 16,
     padding: "14px 16px 15px",
     boxShadow: tokens.shadowCard,
@@ -45,7 +49,7 @@ function KpiCard({
   };
   return (
     <div className="card-hover" style={card}>
-      {/* gradient top border */}
+      {/* thin top accent line */}
       <span
         style={{
           position: "absolute",
@@ -54,19 +58,6 @@ function KpiCard({
           right: 0,
           height: 3,
           background: `linear-gradient(90deg, ${accent} 0%, color-mix(in srgb, ${accent} 45%, transparent) 100%)`,
-        }}
-      />
-      {/* soft glow */}
-      <span
-        style={{
-          position: "absolute",
-          top: -28,
-          right: -20,
-          width: 120,
-          height: 120,
-          borderRadius: "50%",
-          background: `radial-gradient(circle, color-mix(in srgb, ${accent} 16%, transparent) 0%, transparent 70%)`,
-          pointerEvents: "none",
         }}
       />
       <span
@@ -135,15 +126,35 @@ export function KpiRow({
         value={next ? next.ticker : "—"}
         sub={next ? `${next.subtype} · ${relative(next.date, today)}` : "Nothing upcoming"}
         accent="#4f46e5"
+        bg="var(--kpi1-bg)"
+        bd="var(--kpi1-bd)"
         Icon={CalendarIcon}
       />
-      <KpiCard label="Events this week" value={String(thisWeek)} sub="Today through Sunday" accent="#2563eb" Icon={LayersIcon} />
-      <KpiCard label="Companies reporting" value={String(reporting)} sub="Earnings in current view" accent="#06b6d4" Icon={BuildingIcon} />
+      <KpiCard
+        label="Events this week"
+        value={String(thisWeek)}
+        sub="Today through Sunday"
+        accent="#2563eb"
+        bg="var(--kpi2-bg)"
+        bd="var(--kpi2-bd)"
+        Icon={LayersIcon}
+      />
+      <KpiCard
+        label="Companies reporting"
+        value={String(reporting)}
+        sub="Earnings in current view"
+        accent="#06b6d4"
+        bg="var(--kpi3-bg)"
+        bd="var(--kpi3-bd)"
+        Icon={BuildingIcon}
+      />
       <KpiCard
         label="Data freshness"
         value={live ? "Live" : "Sample"}
         sub={`Updated ${formatTime(generatedAt)}`}
-        accent={live ? "#10b981" : "#f59e0b"}
+        accent="#10b981"
+        bg="var(--kpi4-bg)"
+        bd="var(--kpi4-bd)"
         Icon={ActivityIcon}
       />
     </div>
