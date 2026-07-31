@@ -67,7 +67,7 @@ function chip(label: string, hex: string): Chip {
 export const eventTypeMeta: Record<EventType, Chip> = {
   EARNINGS: chip("Earnings", "#2563eb"),
   CONCALL: chip("Concall", "#14b8a6"),
-  DEMERGER: chip("Corporate Action", "#f59e0b"),
+  DEMERGER: chip("Corporate Action", "#2563eb"),
 };
 
 // Filing categories in the details panel.
