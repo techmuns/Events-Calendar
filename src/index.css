@@ -38,10 +38,10 @@
   --shadow-header: 0 8px 24px rgba(37, 60, 190, 0.28);
 
   /* KPI card gradients — smooth directional pastel tints (no radial blobs) */
-  --kpi1-bg: linear-gradient(110deg, #ffffff 0%, #f8f7ff 55%, #eeecff 100%);
-  --kpi1-bd: #e6e1f7;
-  --kpi2-bg: linear-gradient(110deg, #ffffff 0%, #f5f8ff 55%, #e9f0ff 100%);
-  --kpi2-bd: #dce7fa;
+  --kpi1-bg: linear-gradient(110deg, #f6f2ff 0%, #efe9ff 55%, #e7deff 100%);
+  --kpi1-bd: #dccff4;
+  --kpi2-bg: linear-gradient(110deg, #f2f6ff 0%, #eaf1ff 55%, #dee9ff 100%);
+  --kpi2-bd: #d2e0f8;
   --kpi3-bg: linear-gradient(110deg, #ffffff 0%, #f3fcfd 55%, #e3f8fa 100%);
   --kpi3-bd: #d0edf1;
   --kpi4-bg: linear-gradient(110deg, #ffffff 0%, #f4fcf8 55%, #e3f7ed 100%);
