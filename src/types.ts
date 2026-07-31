@@ -53,20 +53,29 @@ export interface EventsResult {
 // direct PDF link. Populated on demand when a company's event is opened.
 
 export type FilingCategory = "PRESS" | "MEET" | "PRESENTATION" | "CONCALL" | "SCHEME";
+export type FilingSource = "NSE" | "BSE" | "Screener" | "Web";
+
+export interface FilingLink {
+  label: string; // e.g. "Transcript", "PPT", "REC"
+  url: string;
+  source: FilingSource;
+}
 
 export interface CompanyFiling {
   category: FilingCategory;
   title: string; // short human label from the filing
   date: string; // ISO date filed
-  url: string; // direct link to the PDF on the exchange
+  url?: string; // single-document filings (announcements)
+  links?: FilingLink[]; // multi-document filings (Screener concalls)
+  source: FilingSource; // where the primary document is hosted
 }
 
 export interface CompanyFilingsResult {
   symbol: string;
   filings: CompanyFiling[];
   generatedAt: string;
-  source: string;
-  ok?: boolean; // false when the exchange fetch failed (vs. genuinely no filings)
+  source: string; // provenance label, e.g. "BSE · NSE · Screener"
+  ok?: boolean; // false when every source failed (vs. genuinely no filings)
 }
 
 // ---- Filter state shared across the dashboard ----

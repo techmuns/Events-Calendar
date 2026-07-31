@@ -48,12 +48,28 @@ interface ConcallItem {
 }
 
 type FilingCategory = "PRESS" | "MEET" | "PRESENTATION" | "CONCALL" | "SCHEME";
+type FilingSource = "NSE" | "BSE" | "Screener" | "Web";
+
+interface FilingLink {
+  label: string;
+  url: string;
+  source: FilingSource;
+}
 
 interface CompanyFiling {
   category: FilingCategory;
   title: string;
   date: string;
-  url: string;
+  url?: string; // single-document filings (NSE/BSE announcements)
+  links?: FilingLink[]; // multi-document filings (Screener concalls: transcript/PPT/rec)
+  source: FilingSource;
+}
+
+function hostSource(url: string): FilingSource {
+  if (/bseindia\.com/i.test(url)) return "BSE";
+  if (/nseindia\.com/i.test(url)) return "NSE";
+  if (/screener\.in/i.test(url)) return "Screener";
+  return "Web";
 }
 
 const NSE = "https://www.nseindia.com";
@@ -392,26 +408,22 @@ function parseCompanyFilings(data: unknown): CompanyFiling[] {
     const date = anyDate(r.an_dt) ?? anyDate(r.sort_date ?? "");
     if (!date) continue;
     seen.add(url);
-    out.push({ category: cat, title: filingTitle(r.attchmntText ?? "", r.desc ?? ""), date, url });
+    out.push({ category: cat, title: filingTitle(r.attchmntText ?? "", r.desc ?? ""), date, url, source: hostSource(url) });
   }
   out.sort((a, b) => b.date.localeCompare(a.date));
   return out.slice(0, 40);
 }
 
-async function buildCompanyFilings(symbol: string) {
-  const sym = symbol.toUpperCase().trim();
+// NSE announcements for one symbol → categorised filings. NSE intermittently
+// blocks bursts (erroring, or an empty 200), so retry with a fresh cookie.
+async function fetchNseFilings(sym: string): Promise<{ filings: CompanyFiling[]; reached: boolean }> {
   const now = new Date();
   const from = new Date(now);
   from.setDate(from.getDate() - 150);
   const path = `/api/corporate-announcements?index=equities&symbol=${encodeURIComponent(sym)}&from_date=${nseDate(
     from,
   )}&to_date=${nseDate(now)}`;
-  // The symbol's own quote page is the referer NSE expects for a symbol query.
   const referer = `${NSE}/get-quotes/equity?symbol=${encodeURIComponent(sym)}`;
-
-  // NSE intermittently blocks bursts, sometimes by erroring and sometimes by
-  // returning an empty 200. Retry with a fresh cookie until we get rows or run
-  // out of attempts; `reached` tracks whether NSE actually answered.
   let filings: CompanyFiling[] = [];
   let reached = false;
   for (let attempt = 0; attempt < 3 && filings.length === 0; attempt++) {
@@ -424,7 +436,151 @@ async function buildCompanyFilings(symbol: string) {
       /* transient — try again with a fresh cookie */
     }
   }
-  return { symbol: sym, filings, generatedAt: new Date().toISOString(), source: "NSE", ok: reached };
+  return { filings, reached };
+}
+
+// ---- Screener.in --------------------------------------------------------------
+// Screener aggregates BSE + NSE filings and, uniquely, per-quarter concalls with
+// direct Transcript / PPT / Recording links. We also use its search to resolve a
+// company's canonical symbol (fixes BSE short-names that aren't NSE symbols).
+const SCREENER = "https://www.screener.in";
+
+async function screenerFetch(path: string): Promise<string> {
+  const res = await fetch(`${SCREENER}${path}`, {
+    headers: {
+      "User-Agent": UA,
+      Accept: "text/html,application/json,*/*",
+      "Accept-Language": "en-US,en;q=0.9",
+    },
+  });
+  if (!res.ok) throw new Error(`Screener ${path} -> ${res.status}`);
+  return res.text();
+}
+
+function normName(s: string): string {
+  return (s ?? "").toLowerCase().replace(/limited|ltd/g, "").replace(/[^a-z0-9]/g, "");
+}
+
+// Search returns several matches (e.g. "Vedanta Ltd" vs "Vedanta Aluminium");
+// prefer the closest name to the query rather than blindly taking the first.
+function pickScreener(arr: Array<{ name: string; url: string }>, query: string): { name: string; url: string } {
+  const q = normName(query);
+  let best = arr[0];
+  let bestScore = -1;
+  for (const c of arr) {
+    const n = normName(c.name);
+    let score: number;
+    if (n === q) score = 100;
+    else if (n.startsWith(q) || q.startsWith(n)) score = 60 - Math.abs(n.length - q.length);
+    else if (n.includes(q) || q.includes(n)) score = 30 - Math.abs(n.length - q.length);
+    else score = 0;
+    if (score > bestScore) {
+      bestScore = score;
+      best = c;
+    }
+  }
+  return best;
+}
+
+async function resolveScreener(query: string): Promise<{ sym: string; html: string } | null> {
+  try {
+    const raw = await screenerFetch(`/api/company/search/?q=${encodeURIComponent(query)}`);
+    const arr = JSON.parse(raw) as Array<{ name: string; url: string }>;
+    if (!Array.isArray(arr) || arr.length === 0) return null;
+    const hit = pickScreener(arr, query);
+    const path = hit.url.startsWith("/") ? hit.url : `/${hit.url}`;
+    const sym = (/\/company\/([^/]+)\//.exec(path)?.[1] ?? "").trim();
+    const html = await screenerFetch(path);
+    return { sym, html };
+  } catch {
+    return null;
+  }
+}
+
+function screenerMonthISO(label: string): string | null {
+  const m = /([A-Za-z]{3,})\s+(\d{4})/.exec(label ?? "");
+  if (!m) return null;
+  const key = m[1].slice(0, 3);
+  const mon = MONTHS[key.charAt(0).toUpperCase() + key.slice(1).toLowerCase()];
+  if (!mon) return null;
+  return `${m[2]}-${mon}-01`;
+}
+
+// Each concall is one <li> with a "Mon YYYY" label and Transcript/PPT/REC links.
+function parseScreenerConcalls(html: string): CompanyFiling[] {
+  const start = html.indexOf("documents concalls");
+  if (start < 0) return [];
+  const block = html.slice(start, start + 24000);
+  const out: CompanyFiling[] = [];
+  const liRe = /<li class="flex flex-gap-8 flex-wrap-420">([\s\S]*?)<\/li>/g;
+  let li: RegExpExecArray | null;
+  while ((li = liRe.exec(block))) {
+    const seg = li[1];
+    const label = (/width:\s*74px">([^<]+)</.exec(seg)?.[1] ?? "").trim();
+    const iso = screenerMonthISO(label);
+    if (!iso) continue;
+    const links: FilingLink[] = [];
+    const aRe = /<a\s+href="([^"]+)"[^>]*class="concall-link"[^>]*>\s*([^<]+?)\s*<\/a>/g;
+    let a: RegExpExecArray | null;
+    while ((a = aRe.exec(seg))) {
+      const href = a[1].trim();
+      const lbl = a[2].trim();
+      if (href && lbl) links.push({ label: lbl, url: href, source: hostSource(href) });
+    }
+    if (!links.length) continue;
+    const primary =
+      links.find((l) => /transcript/i.test(l.label)) ?? links.find((l) => /ppt/i.test(l.label)) ?? links[0];
+    // Credit Screener as the aggregator that surfaced the concall; the individual
+    // links keep their real host (BSE/NSE/company) for provenance.
+    out.push({ category: "CONCALL", title: `Concall · ${label}`, date: iso, links, url: primary.url, source: "Screener" });
+  }
+  return out.slice(0, 12);
+}
+
+async function buildCompanyFilings(name: string, symbol: string) {
+  const sym0 = (symbol ?? "").toUpperCase().trim();
+  const query = (name ?? "").trim() || sym0;
+  const filings: CompanyFiling[] = [];
+  let canonical = sym0;
+
+  // 1. Screener: canonical symbol + per-quarter concalls (transcript/PPT/rec).
+  const scr = await resolveScreener(query).catch(() => null);
+  if (scr) {
+    if (scr.sym && /^[A-Za-z0-9&_-]+$/.test(scr.sym)) canonical = scr.sym.toUpperCase();
+    filings.push(...parseScreenerConcalls(scr.html));
+  }
+
+  // 2. NSE announcements via the canonical symbol (fixes BSE short-name misses).
+  let reached = false;
+  if (canonical && /[A-Za-z]/.test(canonical)) {
+    const nse = await fetchNseFilings(canonical);
+    reached = nse.reached;
+    // Screener already supplies richer concalls, so keep NSE's other categories.
+    const hasConcalls = filings.some((f) => f.category === "CONCALL");
+    for (const f of nse.filings) {
+      if (hasConcalls && f.category === "CONCALL") continue;
+      filings.push(f);
+    }
+  }
+
+  filings.sort((a, b) => b.date.localeCompare(a.date));
+
+  const provs = new Set<FilingSource>();
+  for (const f of filings) {
+    provs.add(f.source);
+    for (const l of f.links ?? []) provs.add(l.source);
+  }
+  provs.delete("Web");
+  const order: FilingSource[] = ["BSE", "NSE", "Screener"];
+  const label = order.filter((s) => provs.has(s)).join(" · ") || "NSE";
+
+  return {
+    symbol: canonical || sym0,
+    filings,
+    generatedAt: new Date().toISOString(),
+    source: label,
+    ok: reached || filings.length > 0,
+  };
 }
 
 async function buildLiveResult() {
@@ -539,13 +695,14 @@ export default {
     if (url.pathname === "/api/corporate-calendar") return handleApi(request, ctx);
     if (url.pathname === "/api/company-filings") {
       const symbol = url.searchParams.get("symbol") ?? "";
-      if (!symbol.trim()) {
+      const name = url.searchParams.get("name") ?? "";
+      if (!symbol.trim() && !name.trim()) {
         return new Response(
-          JSON.stringify({ symbol: "", filings: [], generatedAt: new Date().toISOString(), source: "NSE" }),
+          JSON.stringify({ symbol: "", filings: [], generatedAt: new Date().toISOString(), source: "" }),
           { headers: { "Content-Type": "application/json" } },
         );
       }
-      return cachedJson(request, ctx, () => buildCompanyFilings(symbol));
+      return cachedJson(request, ctx, () => buildCompanyFilings(name, symbol));
     }
     if (url.pathname === "/api/health") {
       return new Response(JSON.stringify({ ok: true }), {

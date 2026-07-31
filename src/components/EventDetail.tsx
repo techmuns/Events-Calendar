@@ -98,7 +98,7 @@ export function EventDetail({
         </a>
       )}
 
-      <CompanyFilings ticker={event.ticker} />
+      <CompanyFilings ticker={event.ticker} name={event.company} />
 
       {others.length > 0 && (
         <div style={{ marginTop: 22 }}>

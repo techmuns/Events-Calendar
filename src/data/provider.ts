@@ -50,17 +50,22 @@ export const eventsProvider: EventsProvider = {
 };
 
 // Per-company filings, fetched on demand when a company is opened in Details.
-// Results are memoised per symbol for the session so re-opening is instant.
+// Aggregated server-side from NSE + Screener (+ BSE-hosted docs via Screener).
+// Results are memoised per company for the session so re-opening is instant.
 const filingsCache = new Map<string, CompanyFilingsResult>();
 
-export async function getCompanyFilings(symbol: string): Promise<CompanyFilingsResult> {
+export async function getCompanyFilings(symbol: string, name = ""): Promise<CompanyFilingsResult> {
   const sym = symbol.trim().toUpperCase();
-  const cached = filingsCache.get(sym);
+  const key = `${sym}|${name.trim().toLowerCase()}`;
+  const cached = filingsCache.get(key);
   if (cached) return cached;
-  const res = await fetch(`/api/company-filings?symbol=${encodeURIComponent(sym)}`);
+  const qs = new URLSearchParams();
+  if (sym) qs.set("symbol", sym);
+  if (name.trim()) qs.set("name", name.trim());
+  const res = await fetch(`/api/company-filings?${qs.toString()}`);
   if (!res.ok) throw new Error(`Filings unavailable (HTTP ${res.status})`);
   const data = (await res.json()) as CompanyFilingsResult;
   const normalised: CompanyFilingsResult = { ...data, filings: data.filings ?? [] };
-  filingsCache.set(sym, normalised);
+  filingsCache.set(key, normalised);
   return normalised;
 }
