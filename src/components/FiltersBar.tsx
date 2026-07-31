@@ -13,12 +13,12 @@ const HORIZONS = [7, 30, 90];
 const TYPES: EventType[] = ["EARNINGS", "DEMERGER"];
 
 const groupLabel: CSSProperties = {
-  fontSize: 9.5,
+  fontSize: 11,
   fontWeight: 700,
   textTransform: "uppercase",
-  letterSpacing: "0.06em",
-  color: tokens.textHint,
-  marginBottom: 7,
+  letterSpacing: "0.04em",
+  color: tokens.textMuted,
+  marginBottom: 8,
 };
 
 function Segmented<T extends string | number>({
@@ -50,12 +50,12 @@ function Segmented<T extends string | number>({
             style={{
               border: "none",
               cursor: "pointer",
-              fontSize: 12.5,
-              fontWeight: 600,
-              padding: "5px 12px",
+              fontSize: 14,
+              fontWeight: active ? 700 : 600,
+              padding: "6px 14px",
               borderRadius: 7,
               background: active ? tokens.gradientBrand : "transparent",
-              color: active ? "#ffffff" : tokens.textMuted,
+              color: active ? "#ffffff" : tokens.textPrimary,
               boxShadow: active ? "0 1px 3px rgba(37,60,190,0.35)" : "none",
               transition: "all 0.2s",
               whiteSpace: "nowrap",
@@ -93,7 +93,7 @@ export function FiltersBar({
       style={{
         display: "flex",
         flexWrap: "wrap",
-        gap: 18,
+        gap: 20,
         alignItems: "flex-end",
         background: tokens.cardBg,
         border: `1px solid ${tokens.border}`,
@@ -121,15 +121,15 @@ export function FiltersBar({
                 onClick={() => toggleType(t)}
                 style={{
                   cursor: "pointer",
-                  fontSize: 12.5,
-                  fontWeight: 600,
-                  padding: "6px 12px",
+                  fontSize: 14,
+                  fontWeight: active ? 700 : 600,
+                  padding: "6px 13px",
                   borderRadius: 9,
                   display: "inline-flex",
                   alignItems: "center",
                   gap: 7,
                   background: active ? m.bg : tokens.surface,
-                  color: active ? m.text : tokens.textHint,
+                  color: active ? m.text : tokens.textSecondary,
                   border: `1px solid ${active ? m.border : tokens.border}`,
                   transition: "all 0.2s",
                 }}
@@ -147,12 +147,12 @@ export function FiltersBar({
                 {counts?.[t] !== undefined && (
                   <span
                     style={{
-                      fontSize: 11,
+                      fontSize: 12,
                       fontWeight: 700,
-                      color: active ? m.text : tokens.textHint,
-                      background: active ? "rgba(255,255,255,0.5)" : tokens.surface2,
+                      color: active ? m.text : tokens.textMuted,
+                      background: active ? "rgba(255,255,255,0.55)" : tokens.surface2,
                       borderRadius: 6,
-                      padding: "0 5px",
+                      padding: "1px 6px",
                     }}
                   >
                     {counts[t]}
@@ -188,7 +188,8 @@ export function FiltersBar({
             style={{
               width: "100%",
               boxSizing: "border-box",
-              fontSize: 13,
+              fontSize: 14,
+              fontWeight: 500,
               padding: "8px 12px 8px 34px",
               borderRadius: 10,
               border: `1px solid ${tokens.border}`,

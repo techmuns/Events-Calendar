@@ -339,7 +339,7 @@ export function EventDetail({
           flexShrink: 0,
           padding: "16px 18px 14px",
           borderBottom: `1px solid ${tokens.border}`,
-          background: `linear-gradient(135deg, color-mix(in srgb, ${accent} 18%, var(--card-bg)) 0%, var(--card-bg) 72%)`,
+          background: "var(--detail-header-bg)",
         }}
       >
         <div style={{ display: "flex", gap: 12, alignItems: "center" }}>
