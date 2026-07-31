@@ -106,7 +106,7 @@ function LinkAction({ label, url }: { label: string; url: string }) {
   );
 }
 
-function DocumentCard({ f }: { f: CompanyFiling }) {
+function DocumentCard({ f, accent }: { f: CompanyFiling; accent: string }) {
   const cat = filingCategoryMeta[f.category];
   return (
     <div
@@ -171,9 +171,9 @@ function DocumentCard({ f }: { f: CompanyFiling }) {
               ...chipBtn,
               flex: 1,
               color: "#fff",
-              background: tokens.gradientBrand,
+              background: `linear-gradient(135deg, ${accent} 0%, color-mix(in srgb, ${accent} 74%, #000) 100%)`,
               border: "none",
-              boxShadow: "0 1px 3px rgba(37,60,190,0.35)",
+              boxShadow: `0 1px 3px color-mix(in srgb, ${accent} 45%, transparent)`,
             }}
           >
             <ExternalLinkIcon size={13} /> Open Filing
@@ -273,7 +273,12 @@ export function EventDetail({
   const [tab, setTab] = useState<"overview" | FilingCategory>("overview");
   useEffect(() => setTab("overview"), [event.id]);
 
+  // Company identity accent, derived from the initials/avatar colour and applied
+  // consistently across the details panel (avatar, active tab, count pills, CTA).
   const accent = companyAccent(event.ticker || event.company);
+  const accentGrad = `linear-gradient(135deg, ${accent} 0%, color-mix(in srgb, ${accent} 74%, #000) 100%)`;
+  const accentShadow = `0 1px 3px color-mix(in srgb, ${accent} 45%, transparent)`;
+  const accentSoftBg = `color-mix(in srgb, ${accent} 12%, transparent)`;
   const typeMeta = eventTypeMeta[event.eventType];
   const status = statusMeta[event.status];
   const starred = isStarred(event.ticker);
@@ -306,14 +311,14 @@ export function EventDetail({
     gap: 6,
     cursor: "pointer",
     border: "none",
-    background: active ? tokens.gradientBrand : "transparent",
+    background: active ? accentGrad : "transparent",
     color: active ? "#fff" : tokens.textMuted,
     fontSize: 12,
     fontWeight: 600,
     padding: "6px 11px",
     borderRadius: 9,
     whiteSpace: "nowrap",
-    boxShadow: active ? "0 1px 3px rgba(37,60,190,0.35)" : "none",
+    boxShadow: active ? accentShadow : "none",
   });
 
   const countPill = (active: boolean, n: number) => (
@@ -321,8 +326,8 @@ export function EventDetail({
       style={{
         fontSize: 10.5,
         fontWeight: 700,
-        color: active ? "#fff" : tokens.textHint,
-        background: active ? "rgba(255,255,255,0.25)" : tokens.surface2,
+        color: active ? "#fff" : accent,
+        background: active ? "rgba(255,255,255,0.25)" : accentSoftBg,
         borderRadius: 6,
         padding: "0 5px",
       }}
@@ -355,7 +360,7 @@ export function EventDetail({
               fontSize: 16,
               fontWeight: 800,
               color: "#fff",
-              background: `linear-gradient(135deg, ${accent}, color-mix(in srgb, ${accent} 55%, #06b6d4))`,
+              background: accentGrad,
               boxShadow: `0 4px 12px color-mix(in srgb, ${accent} 40%, transparent)`,
             }}
           >
@@ -563,7 +568,7 @@ export function EventDetail({
         ) : (
           <div style={{ display: "flex", flexDirection: "column", gap: 9 }}>
             {byCat[tab].map((f, i) =>
-              f.links && f.links.length ? <ConcallCard key={i} f={f} /> : <DocumentCard key={i} f={f} />,
+              f.links && f.links.length ? <ConcallCard key={i} f={f} /> : <DocumentCard key={i} f={f} accent={accent} />,
             )}
           </div>
         )}
