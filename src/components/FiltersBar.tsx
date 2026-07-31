@@ -9,7 +9,7 @@ const UNIVERSES: { key: Universe; label: string }[] = [
   { key: "ALL", label: "All" },
 ];
 const HORIZONS = [7, 30, 90];
-const TYPES: EventType[] = ["EARNINGS", "CONCALL", "DEMERGER"];
+const TYPES: EventType[] = ["EARNINGS", "DEMERGER"];
 
 const groupLabel: CSSProperties = {
   fontSize: 10,

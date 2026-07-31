@@ -14,7 +14,7 @@ import { DetailTable } from "./components/DetailTable";
 import { WidgetCard } from "./components/WidgetCard";
 import { ErrorState, ShimmerRows } from "./components/states";
 import { Heatmap } from "./components/Heatmap";
-import { DetailPanel, type DetailTab } from "./components/DetailPanel";
+import { DetailPanel } from "./components/DetailPanel";
 import { useTheme } from "./hooks/useTheme";
 import { useWatchlist } from "./hooks/useWatchlist";
 import { useEventDiff } from "./hooks/useEventDiff";
@@ -22,7 +22,7 @@ import { CalendarIcon, MoonIcon, RefreshIcon, SunIcon } from "./components/icons
 
 const DEFAULT_FILTERS: Filters = {
   universe: "ALL",
-  types: ["EARNINGS", "CONCALL", "DEMERGER"],
+  types: ["EARNINGS", "DEMERGER"],
   horizonDays: 90,
   search: "",
 };
@@ -81,12 +81,10 @@ export default function App() {
   const { isDark, toggle } = useTheme();
   const watchlist = useWatchlist();
   const [selected, setSelected] = useState<CorporateEvent | null>(null);
-  const [rightTab, setRightTab] = useState<DetailTab>("concalls");
   const [focusDay, setFocusDay] = useState<string | null>(null);
 
   const selectEvent = (e: CorporateEvent) => {
     setSelected(e);
-    setRightTab("details");
   };
 
   const baseFiltered = result ? applyFilters(result.events, filters, watchlist.set) : [];
@@ -101,11 +99,10 @@ export default function App() {
     if (!result) return c;
     const all = applyFilters(
       result.events,
-      { ...filters, types: ["EARNINGS", "CONCALL", "DEMERGER"] },
+      { ...filters, types: ["EARNINGS", "DEMERGER"] },
       watchlist.set,
     );
     for (const e of all) c[e.eventType]++;
-    c.CONCALL = result.concalls.length;
     return c;
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [result, filters.universe, filters.horizonDays, filters.search, watchlist.set]);
@@ -284,10 +281,6 @@ export default function App() {
             <DetailPanel
               selected={selected}
               allEvents={result?.events ?? []}
-              concalls={result?.concalls ?? []}
-              showConcalls={filters.types.includes("CONCALL")}
-              tab={rightTab}
-              onTab={setRightTab}
               onSelect={selectEvent}
               isStarred={watchlist.has}
               onToggleStar={watchlist.toggle}
