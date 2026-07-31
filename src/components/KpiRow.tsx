@@ -2,6 +2,9 @@ import type { CSSProperties } from "react";
 import type { CorporateEvent } from "../types";
 import { tokens } from "../theme";
 import { bucketFor, diffDays, formatDate, parseISO, todayStart } from "../lib/dates";
+import { ActivityIcon, BuildingIcon, CalendarIcon, LayersIcon } from "./icons";
+
+type IconCmp = (p: { size?: number }) => JSX.Element;
 
 function relative(iso: string, today: Date): string {
   const d = diffDays(today, parseISO(iso));
@@ -15,7 +18,99 @@ function formatTime(iso: string): string {
   return d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
 }
 
-// Compact one-line stat strip (four segments) so the events list stays the hero.
+function KpiCard({
+  label,
+  value,
+  sub,
+  accent,
+  Icon,
+}: {
+  label: string;
+  value: string;
+  sub: string;
+  accent: string;
+  Icon: IconCmp;
+}) {
+  const card: CSSProperties = {
+    position: "relative",
+    overflow: "hidden",
+    background: tokens.cardBg,
+    border: `1px solid ${tokens.border}`,
+    borderRadius: 16,
+    padding: "14px 16px 15px",
+    boxShadow: tokens.shadowCard,
+    display: "flex",
+    alignItems: "center",
+    gap: 13,
+  };
+  return (
+    <div className="card-hover" style={card}>
+      {/* gradient top border */}
+      <span
+        style={{
+          position: "absolute",
+          top: 0,
+          left: 0,
+          right: 0,
+          height: 3,
+          background: `linear-gradient(90deg, ${accent} 0%, color-mix(in srgb, ${accent} 45%, transparent) 100%)`,
+        }}
+      />
+      {/* soft glow */}
+      <span
+        style={{
+          position: "absolute",
+          top: -28,
+          right: -20,
+          width: 120,
+          height: 120,
+          borderRadius: "50%",
+          background: `radial-gradient(circle, color-mix(in srgb, ${accent} 16%, transparent) 0%, transparent 70%)`,
+          pointerEvents: "none",
+        }}
+      />
+      <span
+        style={{
+          flexShrink: 0,
+          width: 40,
+          height: 40,
+          borderRadius: 12,
+          display: "inline-flex",
+          alignItems: "center",
+          justifyContent: "center",
+          color: accent,
+          background: `color-mix(in srgb, ${accent} 12%, transparent)`,
+          border: `1px solid color-mix(in srgb, ${accent} 26%, transparent)`,
+        }}
+      >
+        <Icon size={20} />
+      </span>
+      <div style={{ minWidth: 0, position: "relative" }}>
+        <div style={{ fontSize: 10.5, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.05em", color: tokens.textHint }}>
+          {label}
+        </div>
+        <div
+          style={{
+            fontSize: 21,
+            fontWeight: 800,
+            color: tokens.textPrimary,
+            lineHeight: 1.15,
+            letterSpacing: "-0.01em",
+            whiteSpace: "nowrap",
+            overflow: "hidden",
+            textOverflow: "ellipsis",
+          }}
+        >
+          {value}
+        </div>
+        <div style={{ fontSize: 11.5, color: tokens.textMuted, marginTop: 1, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+          {sub}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export function KpiRow({
   events,
   generatedAt,
@@ -26,84 +121,31 @@ export function KpiRow({
   live: boolean;
 }) {
   const today = todayStart();
-  const next = events[0]; // events arrive sorted by date
+  const next = events[0];
   const thisWeek = events.filter((e) => {
     const b = bucketFor(e.date, today);
     return b === "Today" || b === "This week";
   }).length;
   const reporting = new Set(events.filter((e) => e.eventType === "EARNINGS").map((e) => e.ticker)).size;
 
-  const items: { label: string; value: string; sub?: string; accent?: string }[] = [
-    {
-      label: "Next event",
-      value: next ? next.ticker : "—",
-      sub: next ? relative(next.date, today) : "Nothing upcoming",
-      accent: tokens.primaryText,
-    },
-    { label: "This week", value: String(thisWeek), sub: "Today–Sun" },
-    { label: "Reporting", value: String(reporting), sub: "in view" },
-    {
-      label: "Freshness",
-      value: live ? "Live" : "Sample",
-      sub: formatTime(generatedAt),
-      accent: live ? "#16a34a" : undefined,
-    },
-  ];
-
-  const strip: CSSProperties = {
-    display: "flex",
-    background: tokens.cardBg,
-    border: `1px solid ${tokens.border}`,
-    borderRadius: 12,
-    boxShadow: "0 1px 4px rgba(0,0,0,0.04)",
-    overflow: "hidden",
-  };
-
   return (
-    <div style={strip}>
-      {items.map((it, i) => (
-        <div
-          key={it.label}
-          style={{
-            flex: 1,
-            minWidth: 0,
-            padding: "8px 14px",
-            borderRight: i < items.length - 1 ? `1px solid ${tokens.border}` : "none",
-            display: "flex",
-            flexDirection: "column",
-            gap: 1,
-          }}
-        >
-          <span
-            style={{
-              fontSize: 9.5,
-              fontWeight: 700,
-              textTransform: "uppercase",
-              letterSpacing: "0.04em",
-              color: tokens.textHint,
-            }}
-          >
-            {it.label}
-          </span>
-          <span style={{ display: "flex", alignItems: "baseline", gap: 6, minWidth: 0 }}>
-            <span
-              style={{
-                fontSize: 14,
-                fontWeight: 800,
-                color: it.accent ?? tokens.textPrimary,
-                whiteSpace: "nowrap",
-                overflow: "hidden",
-                textOverflow: "ellipsis",
-              }}
-            >
-              {it.value}
-            </span>
-            {it.sub && (
-              <span style={{ fontSize: 11, color: tokens.textHint, whiteSpace: "nowrap" }}>{it.sub}</span>
-            )}
-          </span>
-        </div>
-      ))}
+    <div style={{ display: "grid", gap: 14, gridTemplateColumns: "repeat(auto-fit, minmax(188px, 1fr))" }}>
+      <KpiCard
+        label="Next event"
+        value={next ? next.ticker : "—"}
+        sub={next ? `${next.subtype} · ${relative(next.date, today)}` : "Nothing upcoming"}
+        accent="#4f46e5"
+        Icon={CalendarIcon}
+      />
+      <KpiCard label="Events this week" value={String(thisWeek)} sub="Today through Sunday" accent="#2563eb" Icon={LayersIcon} />
+      <KpiCard label="Companies reporting" value={String(reporting)} sub="Earnings in current view" accent="#06b6d4" Icon={BuildingIcon} />
+      <KpiCard
+        label="Data freshness"
+        value={live ? "Live" : "Sample"}
+        sub={`Updated ${formatTime(generatedAt)}`}
+        accent={live ? "#10b981" : "#f59e0b"}
+        Icon={ActivityIcon}
+      />
     </div>
   );
 }

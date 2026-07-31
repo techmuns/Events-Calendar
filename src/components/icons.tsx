@@ -124,3 +124,99 @@ export const DownloadIcon = (p: P) => (
     <line x1="12" y1="15" x2="12" y2="3" />
   </Svg>
 );
+
+export const ClockIcon = (p: P) => (
+  <Svg {...p}>
+    <circle cx="12" cy="12" r="9" />
+    <polyline points="12 7 12 12 15 14" />
+  </Svg>
+);
+
+export const BuildingIcon = (p: P) => (
+  <Svg {...p}>
+    <rect x="4" y="3" width="16" height="18" rx="1.5" />
+    <line x1="9" y1="7" x2="9" y2="7.01" />
+    <line x1="15" y1="7" x2="15" y2="7.01" />
+    <line x1="9" y1="11" x2="9" y2="11.01" />
+    <line x1="15" y1="11" x2="15" y2="11.01" />
+    <path d="M10 21v-4h4v4" />
+  </Svg>
+);
+
+export const ActivityIcon = (p: P) => (
+  <Svg {...p}>
+    <polyline points="22 12 18 12 15 21 9 3 6 12 2 12" />
+  </Svg>
+);
+
+export const UsersIcon = (p: P) => (
+  <Svg {...p}>
+    <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
+    <circle cx="9" cy="7" r="4" />
+    <path d="M23 21v-2a4 4 0 0 0-3-3.87" />
+    <path d="M16 3.13a4 4 0 0 1 0 7.75" />
+  </Svg>
+);
+
+export const PresentationIcon = (p: P) => (
+  <Svg {...p}>
+    <path d="M2 3h20" />
+    <path d="M3 3v11a1 1 0 0 0 1 1h16a1 1 0 0 0 1-1V3" />
+    <path d="m8 21 4-4 4 4" />
+    <line x1="12" y1="15" x2="12" y2="17" />
+  </Svg>
+);
+
+export const MicIcon = (p: P) => (
+  <Svg {...p}>
+    <rect x="9" y="2" width="6" height="12" rx="3" />
+    <path d="M5 10v1a7 7 0 0 0 14 0v-1" />
+    <line x1="12" y1="18" x2="12" y2="22" />
+  </Svg>
+);
+
+export const FileTextIcon = (p: P) => (
+  <Svg {...p}>
+    <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+    <polyline points="14 2 14 8 20 8" />
+    <line x1="8" y1="13" x2="16" y2="13" />
+    <line x1="8" y1="17" x2="13" y2="17" />
+  </Svg>
+);
+
+export const EyeIcon = (p: P) => (
+  <Svg {...p}>
+    <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
+    <circle cx="12" cy="12" r="3" />
+  </Svg>
+);
+
+export const PlayIcon = (p: P) => (
+  <Svg {...p} fill="currentColor" strokeWidth={0}>
+    <path d="M8 5v14l11-7z" />
+  </Svg>
+);
+
+export const LayersIcon = (p: P) => (
+  <Svg {...p}>
+    <polygon points="12 2 2 7 12 12 22 7 12 2" />
+    <polyline points="2 17 12 22 22 17" />
+    <polyline points="2 12 12 17 22 12" />
+  </Svg>
+);
+
+export const SearchIcon = (p: P) => (
+  <Svg {...p}>
+    <circle cx="11" cy="11" r="7" />
+    <line x1="21" y1="21" x2="16.65" y2="16.65" />
+  </Svg>
+);
+
+export const GridIcon = (p: P) => (
+  <Svg {...p}>
+    <rect x="3" y="3" width="7" height="7" rx="1" />
+    <rect x="14" y="3" width="7" height="7" rx="1" />
+    <rect x="14" y="14" width="7" height="7" rx="1" />
+    <rect x="3" y="14" width="7" height="7" rx="1" />
+  </Svg>
+);

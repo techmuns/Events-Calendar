@@ -1,6 +1,7 @@
 import type { CSSProperties } from "react";
 import type { EventType, Filters, Universe } from "../types";
 import { eventTypeMeta, tokens } from "../theme";
+import { SearchIcon } from "./icons";
 
 const UNIVERSES: { key: Universe; label: string }[] = [
   { key: "WATCHLIST", label: "Watchlist" },
@@ -12,12 +13,12 @@ const HORIZONS = [7, 30, 90];
 const TYPES: EventType[] = ["EARNINGS", "DEMERGER"];
 
 const groupLabel: CSSProperties = {
-  fontSize: 10,
-  fontWeight: 600,
+  fontSize: 9.5,
+  fontWeight: 700,
   textTransform: "uppercase",
-  letterSpacing: "0.05em",
+  letterSpacing: "0.06em",
   color: tokens.textHint,
-  marginBottom: 6,
+  marginBottom: 7,
 };
 
 function Segmented<T extends string | number>({
@@ -30,7 +31,16 @@ function Segmented<T extends string | number>({
   onChange: (v: T) => void;
 }) {
   return (
-    <div style={{ display: "inline-flex", background: tokens.surface2, borderRadius: 8, padding: 2 }}>
+    <div
+      style={{
+        display: "inline-flex",
+        background: tokens.surface2,
+        borderRadius: 10,
+        padding: 3,
+        gap: 2,
+        border: `1px solid ${tokens.border}`,
+      }}
+    >
       {options.map((o) => {
         const active = o.key === value;
         return (
@@ -43,11 +53,12 @@ function Segmented<T extends string | number>({
               fontSize: 12.5,
               fontWeight: 600,
               padding: "5px 12px",
-              borderRadius: 6,
-              background: active ? tokens.surface : "transparent",
-              color: active ? tokens.primaryText : tokens.textMuted,
-              boxShadow: active ? "0 1px 2px rgba(0,0,0,0.08)" : "none",
+              borderRadius: 7,
+              background: active ? tokens.gradientBrand : "transparent",
+              color: active ? "#ffffff" : tokens.textMuted,
+              boxShadow: active ? "0 1px 3px rgba(37,60,190,0.35)" : "none",
               transition: "all 0.2s",
+              whiteSpace: "nowrap",
             }}
           >
             {o.label}
@@ -56,6 +67,10 @@ function Segmented<T extends string | number>({
       })}
     </div>
   );
+}
+
+function Divider() {
+  return <div style={{ width: 1, alignSelf: "stretch", background: tokens.border, margin: "0 2px" }} />;
 }
 
 export function FiltersBar({
@@ -78,27 +93,25 @@ export function FiltersBar({
       style={{
         display: "flex",
         flexWrap: "wrap",
-        gap: 24,
+        gap: 18,
         alignItems: "flex-end",
         background: tokens.cardBg,
         border: `1px solid ${tokens.border}`,
-        borderRadius: 16,
-        padding: "14px 18px",
-        boxShadow: "0 1px 4px rgba(0,0,0,0.04)",
+        borderRadius: tokens.radiusCard,
+        padding: "13px 18px",
+        boxShadow: tokens.shadowCard,
       }}
     >
       <div>
         <div style={groupLabel}>Universe</div>
-        <Segmented
-          options={UNIVERSES}
-          value={filters.universe}
-          onChange={(v) => onChange({ ...filters, universe: v })}
-        />
+        <Segmented options={UNIVERSES} value={filters.universe} onChange={(v) => onChange({ ...filters, universe: v })} />
       </div>
+
+      <Divider />
 
       <div>
         <div style={groupLabel}>Event type</div>
-        <div style={{ display: "flex", gap: 6 }}>
+        <div style={{ display: "flex", gap: 7 }}>
           {TYPES.map((t) => {
             const active = filters.types.includes(t);
             const m = eventTypeMeta[t];
@@ -110,23 +123,48 @@ export function FiltersBar({
                   cursor: "pointer",
                   fontSize: 12.5,
                   fontWeight: 600,
-                  padding: "5px 11px",
-                  borderRadius: 8,
+                  padding: "6px 12px",
+                  borderRadius: 9,
+                  display: "inline-flex",
+                  alignItems: "center",
+                  gap: 7,
                   background: active ? m.bg : tokens.surface,
                   color: active ? m.text : tokens.textHint,
-                  border: `1px solid ${active ? m.border : tokens.borderSolid}`,
+                  border: `1px solid ${active ? m.border : tokens.border}`,
                   transition: "all 0.2s",
                 }}
               >
+                <span
+                  style={{
+                    width: 8,
+                    height: 8,
+                    borderRadius: "50%",
+                    background: active ? m.hex : tokens.textHint,
+                    opacity: active ? 1 : 0.5,
+                  }}
+                />
                 {m.label}
                 {counts?.[t] !== undefined && (
-                  <span style={{ marginLeft: 5, fontWeight: 700, opacity: 0.7 }}>{counts[t]}</span>
+                  <span
+                    style={{
+                      fontSize: 11,
+                      fontWeight: 700,
+                      color: active ? m.text : tokens.textHint,
+                      background: active ? "rgba(255,255,255,0.5)" : tokens.surface2,
+                      borderRadius: 6,
+                      padding: "0 5px",
+                    }}
+                  >
+                    {counts[t]}
+                  </span>
                 )}
               </button>
             );
           })}
         </div>
       </div>
+
+      <Divider />
 
       <div>
         <div style={groupLabel}>Horizon</div>
@@ -137,24 +175,30 @@ export function FiltersBar({
         />
       </div>
 
-      <div style={{ flex: 1, minWidth: 180 }}>
+      <div style={{ flex: 1, minWidth: 200 }}>
         <div style={groupLabel}>Search</div>
-        <input
-          value={filters.search}
-          onChange={(e) => onChange({ ...filters, search: e.target.value })}
-          placeholder="Company, ticker or sector…"
-          style={{
-            width: "100%",
-            boxSizing: "border-box",
-            fontSize: 13,
-            padding: "7px 11px",
-            borderRadius: 8,
-            border: `1px solid ${tokens.borderSolid}`,
-            outline: "none",
-            fontFamily: tokens.font,
-            color: tokens.textPrimary,
-          }}
-        />
+        <div style={{ position: "relative", display: "flex", alignItems: "center" }}>
+          <span style={{ position: "absolute", left: 11, color: tokens.textHint, display: "inline-flex", pointerEvents: "none" }}>
+            <SearchIcon size={15} />
+          </span>
+          <input
+            value={filters.search}
+            onChange={(e) => onChange({ ...filters, search: e.target.value })}
+            placeholder="Company, ticker or sector…"
+            style={{
+              width: "100%",
+              boxSizing: "border-box",
+              fontSize: 13,
+              padding: "8px 12px 8px 34px",
+              borderRadius: 10,
+              border: `1px solid ${tokens.border}`,
+              outline: "none",
+              fontFamily: tokens.font,
+              color: tokens.textPrimary,
+              background: tokens.surface,
+            }}
+          />
+        </div>
       </div>
     </div>
   );

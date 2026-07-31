@@ -2,11 +2,10 @@ import type { CSSProperties } from "react";
 import type { CorporateEvent } from "../types";
 import { tokens } from "../theme";
 import { EventDetail } from "./EventDetail";
-import { CalendarIcon } from "./icons";
+import { LayersIcon } from "./icons";
 
-// Right-hand pane: the selected event's details (including its per-company
-// segregated filings). Concalls live inside those filings under their own
-// heading, so there is no separate concalls tab.
+// Sticky right-hand intelligence panel. Shows the selected event's gradient
+// header, tabbed company materials, or a polished empty state.
 export function DetailPanel({
   selected,
   allEvents,
@@ -25,9 +24,8 @@ export function DetailPanel({
   const card: CSSProperties = {
     background: tokens.cardBg,
     border: `1px solid ${tokens.border}`,
-    borderRadius: 16,
-    boxShadow: "0 1px 4px rgba(0,0,0,0.04)",
-    backdropFilter: "blur(8px)",
+    borderRadius: tokens.radiusCard,
+    boxShadow: tokens.shadowCard,
     display: "flex",
     flexDirection: "column",
     flex: 1,
@@ -38,67 +36,63 @@ export function DetailPanel({
 
   return (
     <div style={card}>
-      <div
-        style={{
-          display: "flex",
-          alignItems: "center",
-          gap: 8,
-          padding: "12px 16px",
-          borderBottom: `1px solid ${tokens.border}`,
-          background: tokens.cardHeaderBg,
-          flexShrink: 0,
-        }}
-      >
-        <span style={{ fontSize: 13.5, fontWeight: 700, color: tokens.textPrimary }}>Details</span>
-        {selected && (
+      {selected ? (
+        <EventDetail
+          event={selected}
+          allEvents={allEvents}
+          onSelect={onSelect}
+          isStarred={isStarred}
+          onToggleStar={onToggleStar}
+        />
+      ) : (
+        <div
+          style={{
+            height: "100%",
+            display: "flex",
+            flexDirection: "column",
+            alignItems: "center",
+            justifyContent: "center",
+            textAlign: "center",
+            padding: 32,
+            gap: 12,
+          }}
+        >
           <span
             style={{
-              fontSize: 12,
-              color: tokens.textHint,
-              overflow: "hidden",
-              textOverflow: "ellipsis",
-              whiteSpace: "nowrap",
-            }}
-          >
-            · {selected.ticker}
-          </span>
-        )}
-      </div>
-      <div style={{ flex: 1, minHeight: 0, overflow: "auto", background: tokens.cardBodyBg }}>
-        {selected ? (
-          <EventDetail
-            event={selected}
-            allEvents={allEvents}
-            onSelect={onSelect}
-            isStarred={isStarred}
-            onToggleStar={onToggleStar}
-          />
-        ) : (
-          <div
-            style={{
-              height: "100%",
-              minHeight: 220,
-              display: "flex",
-              flexDirection: "column",
+              width: 60,
+              height: 60,
+              borderRadius: 18,
+              display: "inline-flex",
               alignItems: "center",
               justifyContent: "center",
-              textAlign: "center",
-              padding: 28,
-              gap: 10,
+              color: tokens.primary,
+              background: tokens.gradientSoft,
+              border: `1px solid ${tokens.primaryBorder}`,
             }}
           >
-            <span style={{ color: tokens.textHint }}>
-              <CalendarIcon size={30} />
-            </span>
-            <div style={{ fontSize: 14, fontWeight: 600, color: tokens.textSecondary }}>Select an event</div>
-            <div style={{ fontSize: 12.5, color: tokens.textHint, maxWidth: 260 }}>
-              Click any event on the left to see its details, exchange filing, and segregated filings — press
-              releases, investor meets, presentations and concalls.
-            </div>
-            <div style={{ fontSize: 11.5, color: tokens.textHint, marginTop: 8 }}>Data: {source}</div>
+            <LayersIcon size={26} />
+          </span>
+          <div style={{ fontSize: 15, fontWeight: 700, color: tokens.textPrimary }}>Select an event</div>
+          <div style={{ fontSize: 12.5, color: tokens.textMuted, maxWidth: 280, lineHeight: 1.5 }}>
+            Pick any event on the left to open its company profile — filings, press releases, investor meets,
+            presentations and concalls, aggregated across NSE, BSE and Screener.
           </div>
-        )}
-      </div>
+          <div
+            style={{
+              marginTop: 6,
+              fontSize: 11,
+              fontWeight: 600,
+              color: tokens.textHint,
+              padding: "4px 10px",
+              borderRadius: 99,
+              border: `1px solid ${tokens.border}`,
+              background: tokens.surface,
+            }}
+          >
+            Data · {source}
+          </div>
+        </div>
+      )}
     </div>
   );
 }

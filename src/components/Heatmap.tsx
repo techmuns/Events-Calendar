@@ -1,3 +1,4 @@
+import { useState } from "react";
 import type { CorporateEvent } from "../types";
 import { tokens } from "../theme";
 import { addDays, diffDays, parseISO, toISO, todayStart } from "../lib/dates";
@@ -10,7 +11,7 @@ const WEEKDAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 // never a lonely few bars nor an endless scroll.
 const MIN_DAYS = 21;
 const MAX_DAYS = 60;
-const BAR_AREA = 92; // px, tallest bar
+const BAR_AREA = 96; // px, tallest bar
 
 export interface Day {
   date: Date;
@@ -61,6 +62,14 @@ export function computeDensity(events: CorporateEvent[]): { days: Day[]; max: nu
   return { days, max, busiest };
 }
 
+// Blue → violet with the number of events; weekends muted grey.
+function barColor(d: Day, max: number): string {
+  if (d.count === 0) return `color-mix(in srgb, ${tokens.textHint} 14%, transparent)`;
+  if (d.weekend) return `color-mix(in srgb, ${tokens.textHint} ${Math.round(35 + 30 * (d.count / max))}%, transparent)`;
+  const t = Math.round((d.count / max) * 100);
+  return `color-mix(in srgb, #7c3aed ${t}%, #2563eb)`;
+}
+
 export function Heatmap({
   events,
   selectedDay,
@@ -72,16 +81,10 @@ export function Heatmap({
 }) {
   const { days, max, busiest } = computeDensity(events);
   const valThreshold = Math.max(10, max * 0.3);
-
-  const barColor = (d: Day): string => {
-    if (d.count === 0) return `color-mix(in srgb, ${tokens.textHint} 12%, transparent)`;
-    const t = 0.32 + 0.58 * (d.count / max);
-    const base = d.weekend ? tokens.textHint : tokens.primary;
-    return `color-mix(in srgb, ${base} ${Math.round(t * 100)}%, transparent)`;
-  };
+  const [hover, setHover] = useState<{ day: Day; x: number; y: number } | null>(null);
 
   return (
-    <div style={{ display: "flex", gap: 18, padding: "8px 4px 4px", flexWrap: "wrap" }}>
+    <div style={{ display: "flex", gap: 20, padding: "10px 6px 6px", flexWrap: "wrap" }}>
       {/* Daily bar strip */}
       <div style={{ flex: "1 1 460px", minWidth: 0 }}>
         <div style={{ display: "flex", gap: 4, overflowX: "auto", paddingBottom: 4, alignItems: "flex-end" }}>
@@ -94,12 +97,11 @@ export function Heatmap({
               <button
                 key={d.iso}
                 onClick={() => onSelectDay?.(selected ? null : d.iso)}
-                title={`${dayLabel(d.date)} — ${d.count} event${d.count === 1 ? "" : "s"}${
-                  d.count ? ` (${d.earnings} earnings, ${d.demerger} demergers)` : ""
-                } · click to filter`}
+                onMouseMove={(e) => setHover({ day: d, x: e.clientX, y: e.clientY })}
+                onMouseLeave={() => setHover((h) => (h?.day.iso === d.iso ? null : h))}
                 style={{
                   flex: "1 0 16px",
-                  maxWidth: 40,
+                  maxWidth: 42,
                   display: "flex",
                   flexDirection: "column",
                   alignItems: "center",
@@ -109,11 +111,11 @@ export function Heatmap({
                   border: "none",
                   background: "transparent",
                   padding: 0,
-                  borderLeft: firstOfMonth ? `1px dashed ${tokens.border}` : "none",
-                  height: BAR_AREA + 40,
+                  borderLeft: firstOfMonth ? `1px dashed ${tokens.borderStrong}` : "none",
+                  height: BAR_AREA + 42,
                 }}
               >
-                <span style={{ fontSize: 10, fontWeight: 700, color: tokens.primaryText, height: 13, lineHeight: "13px" }}>
+                <span style={{ fontSize: 10, fontWeight: 700, color: tokens.textSecondary, height: 13, lineHeight: "13px" }}>
                   {d.count >= valThreshold ? d.count : ""}
                 </span>
                 <span
@@ -121,10 +123,13 @@ export function Heatmap({
                     width: "100%",
                     minWidth: 8,
                     height: h,
-                    borderRadius: "4px 4px 0 0",
-                    background: barColor(d),
-                    outline: selected ? `2px solid ${tokens.primary}` : isToday ? `2px solid ${tokens.primaryBorder}` : "none",
+                    borderRadius: "5px 5px 2px 2px",
+                    background: barColor(d, max),
+                    outline: selected ? "2px solid #0f172a" : isToday ? `2px solid ${tokens.primaryBorder}` : "none",
                     outlineOffset: 2,
+                    boxShadow: selected ? "0 0 0 4px rgba(79,70,229,0.2)" : "none",
+                    transition: "filter 0.15s",
+                    filter: hover?.day.iso === d.iso ? "brightness(1.12)" : "none",
                   }}
                 />
                 <span
@@ -149,25 +154,26 @@ export function Heatmap({
             );
           })}
         </div>
-        <div style={{ marginTop: 6, fontSize: 11.5, color: tokens.textMuted }}>
+        <div style={{ marginTop: 8, fontSize: 11.5, color: tokens.textMuted, display: "flex", alignItems: "center", gap: 8 }}>
+          <span style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
+            <span style={{ width: 22, height: 8, borderRadius: 3, background: "linear-gradient(90deg,#2563eb,#7c3aed)" }} />
+            fewer → more events
+          </span>
+          <span style={{ color: tokens.textHint }}>·</span>
           {selectedDay ? (
-            <>
-              Filtered to{" "}
-              <span style={{ fontWeight: 600, color: tokens.textSecondary }}>{dayLabel(parseISO(selectedDay))}</span> · click
-              the day again to clear
-            </>
+            <span>
+              Filtered to <span style={{ fontWeight: 600, color: tokens.textSecondary }}>{dayLabel(parseISO(selectedDay))}</span>
+              {" "}· click again to clear
+            </span>
           ) : (
-            <>
-              Weekdays <span style={{ color: tokens.primaryText, fontWeight: 600 }}>indigo</span>, weekends grey · click any day
-              to filter
-            </>
+            <span>click any day to filter</span>
           )}
         </div>
       </div>
 
-      {/* Busiest days ahead */}
+      {/* Busiest days ahead — ranked cards with gradient progress */}
       {busiest.length > 0 && (
-        <div style={{ flex: "0 1 240px", minWidth: 200 }}>
+        <div style={{ flex: "0 1 250px", minWidth: 210 }}>
           <div
             style={{
               fontSize: 10,
@@ -175,52 +181,124 @@ export function Heatmap({
               textTransform: "uppercase",
               letterSpacing: "0.05em",
               color: tokens.textHint,
-              marginBottom: 8,
+              marginBottom: 9,
             }}
           >
             Busiest days ahead
           </div>
-          <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-            {busiest.map((d) => {
+          <div style={{ display: "flex", flexDirection: "column", gap: 7 }}>
+            {busiest.map((d, i) => {
               const selected = selectedDay === d.iso;
               return (
                 <button
                   key={d.iso}
                   onClick={() => onSelectDay?.(selected ? null : d.iso)}
                   title={`Filter to ${dayLabel(d.date)}`}
+                  className="card-hover"
                   style={{
                     display: "flex",
                     alignItems: "center",
-                    gap: 10,
-                    padding: "7px 9px",
-                    borderRadius: 9,
+                    gap: 11,
+                    padding: "8px 11px",
+                    borderRadius: 12,
                     cursor: "pointer",
                     textAlign: "left",
                     border: `1px solid ${selected ? tokens.primaryBorder : tokens.border}`,
                     background: selected ? tokens.primaryLight : tokens.surface,
+                    boxShadow: tokens.shadowCard,
                   }}
                 >
-                  <span style={{ fontSize: 12.5, fontWeight: 600, color: tokens.textSecondary, width: 84, flexShrink: 0 }}>
-                    {dayLabel(d.date)}
+                  <span
+                    style={{
+                      flexShrink: 0,
+                      width: 22,
+                      height: 22,
+                      borderRadius: 7,
+                      display: "inline-flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      fontSize: 11,
+                      fontWeight: 800,
+                      color: i === 0 ? "#fff" : tokens.textMuted,
+                      background: i === 0 ? tokens.gradientBrand : tokens.surface2,
+                      border: i === 0 ? "none" : `1px solid ${tokens.border}`,
+                    }}
+                  >
+                    {i + 1}
                   </span>
-                  <span style={{ flex: 1, height: 7, background: tokens.surface2, borderRadius: 4, overflow: "hidden" }}>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", gap: 6 }}>
+                      <span style={{ fontSize: 12.5, fontWeight: 600, color: tokens.textSecondary, whiteSpace: "nowrap" }}>
+                        {dayLabel(d.date)}
+                      </span>
+                      <span style={{ fontSize: 13, fontWeight: 800, color: tokens.primaryText }}>{d.count}</span>
+                    </div>
                     <span
                       style={{
                         display: "block",
-                        height: "100%",
-                        width: `${(d.count / max) * 100}%`,
-                        background: tokens.primary,
+                        marginTop: 5,
+                        height: 6,
+                        background: tokens.surface2,
                         borderRadius: 4,
+                        overflow: "hidden",
                       }}
-                    />
-                  </span>
-                  <span style={{ fontSize: 12.5, fontWeight: 700, color: tokens.primaryText, width: 30, textAlign: "right" }}>
-                    {d.count}
-                  </span>
+                    >
+                      <span
+                        style={{
+                          display: "block",
+                          height: "100%",
+                          width: `${(d.count / max) * 100}%`,
+                          background: tokens.gradientBrand,
+                          borderRadius: 4,
+                        }}
+                      />
+                    </span>
+                  </div>
                 </button>
               );
             })}
           </div>
+        </div>
+      )}
+
+      {/* Floating tooltip with the day's event-type breakdown */}
+      {hover && (
+        <div
+          style={{
+            position: "fixed",
+            left: hover.x + 14,
+            top: hover.y - 8,
+            zIndex: 50,
+            pointerEvents: "none",
+            background: "#0f172a",
+            color: "#fff",
+            borderRadius: 10,
+            padding: "8px 11px",
+            boxShadow: "0 10px 24px rgba(15,23,42,0.35)",
+            fontSize: 11.5,
+            minWidth: 150,
+          }}
+        >
+          <div style={{ fontWeight: 700, marginBottom: 3 }}>{dayLabel(hover.day.date)}</div>
+          {hover.day.count === 0 ? (
+            <div style={{ color: "#cbd5e1" }}>No events</div>
+          ) : (
+            <>
+              <div style={{ display: "flex", alignItems: "center", gap: 6, color: "#e2e8f0" }}>
+                <span style={{ width: 7, height: 7, borderRadius: "50%", background: "#60a5fa" }} />
+                {hover.day.earnings} earnings
+              </div>
+              {hover.day.demerger > 0 && (
+                <div style={{ display: "flex", alignItems: "center", gap: 6, color: "#e2e8f0", marginTop: 2 }}>
+                  <span style={{ width: 7, height: 7, borderRadius: "50%", background: "#fbbf24" }} />
+                  {hover.day.demerger} corporate action{hover.day.demerger === 1 ? "" : "s"}
+                </div>
+              )}
+              <div style={{ marginTop: 4, paddingTop: 4, borderTop: "1px solid rgba(255,255,255,0.15)", color: "#94a3b8" }}>
+                {hover.day.count} total · click to filter
+              </div>
+            </>
+          )}
         </div>
       )}
     </div>

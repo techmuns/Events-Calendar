@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import type { CSSProperties } from "react";
+import type { CSSProperties, ReactNode } from "react";
 import type { CorporateEvent, EventType, Filters } from "./types";
 import { tokens } from "./theme";
 import { useEvents } from "./hooks/useEvents";
@@ -39,6 +39,7 @@ function KpiShimmer() {
   );
 }
 
+// Segmented view switcher, styled for the translucent-on-gradient header.
 function ViewToggle({ view, onChange }: { view: View; onChange: (v: View) => void }) {
   const opts: { key: View; label: string }[] = [
     { key: "agenda", label: "Agenda" },
@@ -46,7 +47,16 @@ function ViewToggle({ view, onChange }: { view: View; onChange: (v: View) => voi
     { key: "table", label: "Table" },
   ];
   return (
-    <div style={{ display: "inline-flex", background: tokens.surface2, borderRadius: 8, padding: 2 }}>
+    <div
+      style={{
+        display: "inline-flex",
+        background: "rgba(255,255,255,0.14)",
+        border: "1px solid rgba(255,255,255,0.2)",
+        borderRadius: 10,
+        padding: 3,
+        gap: 2,
+      }}
+    >
       {opts.map((o) => {
         const active = o.key === view;
         return (
@@ -58,11 +68,12 @@ function ViewToggle({ view, onChange }: { view: View; onChange: (v: View) => voi
               cursor: "pointer",
               fontSize: 12.5,
               fontWeight: 600,
-              padding: "5px 12px",
-              borderRadius: 6,
-              background: active ? tokens.surface : "transparent",
-              color: active ? tokens.primaryText : tokens.textMuted,
-              boxShadow: active ? "0 1px 2px rgba(0,0,0,0.08)" : "none",
+              padding: "5px 13px",
+              borderRadius: 7,
+              background: active ? "#ffffff" : "transparent",
+              color: active ? "#4338ca" : "rgba(255,255,255,0.85)",
+              boxShadow: active ? "0 1px 3px rgba(15,23,42,0.18)" : "none",
+              transition: "all 0.2s",
             }}
           >
             {o.label}
@@ -70,6 +81,30 @@ function ViewToggle({ view, onChange }: { view: View; onChange: (v: View) => voi
         );
       })}
     </div>
+  );
+}
+
+function HeaderChip({ children, className }: { children: ReactNode; className?: string }) {
+  return (
+    <span
+      className={className}
+      style={{
+        display: "inline-flex",
+        alignItems: "center",
+        gap: 6,
+        fontSize: 10,
+        fontWeight: 700,
+        textTransform: "uppercase",
+        letterSpacing: "0.05em",
+        padding: "3px 9px",
+        borderRadius: 7,
+        border: "1px solid rgba(255,255,255,0.28)",
+        background: "rgba(255,255,255,0.13)",
+        color: "#ffffff",
+      }}
+    >
+      {children}
+    </span>
   );
 }
 
@@ -117,17 +152,23 @@ export default function App() {
     color: tokens.textPrimary,
   };
 
-  const actionBtn: CSSProperties = {
+  const headerBtn: CSSProperties = {
     cursor: "pointer",
-    border: `1px solid ${tokens.borderSolid}`,
-    background: tokens.surface,
-    borderRadius: 8,
+    border: "1px solid rgba(255,255,255,0.24)",
+    background: "rgba(255,255,255,0.13)",
+    borderRadius: 9,
     padding: "6px 12px",
     fontSize: 12.5,
     fontWeight: 600,
-    color: tokens.textSecondary,
+    color: "#ffffff",
+    display: "inline-flex",
+    alignItems: "center",
+    gap: 6,
   };
 
+  const syncedTime = result
+    ? new Date(result.generatedAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })
+    : "";
   const listTitle = view === "month" ? "Calendar" : view === "table" ? "All events" : "Upcoming events";
   const listSubtitle = result
     ? `${filtered.length} events · next ${filters.horizonDays} days${
@@ -141,75 +182,91 @@ export default function App() {
         style={{
           position: "sticky",
           top: 0,
-          zIndex: 10,
+          zIndex: 20,
           display: "flex",
           alignItems: "center",
           justifyContent: "space-between",
+          gap: 12,
           padding: "0 20px",
-          height: 48,
-          background: tokens.cardHeaderBg,
-          backdropFilter: "blur(8px)",
-          borderBottom: `1px solid ${tokens.borderSolid}`,
+          height: 62,
+          background: tokens.gradientBrand,
+          boxShadow: tokens.shadowHeader,
           flexShrink: 0,
         }}
       >
-        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-          <span style={{ color: tokens.primary, display: "inline-flex" }}>
-            <CalendarIcon size={18} />
-          </span>
-          <h1 style={{ fontSize: 15, fontWeight: 700, color: tokens.textPrimary, margin: 0 }}>
-            Events Calendar
-          </h1>
+        <div style={{ display: "flex", alignItems: "center", gap: 12, minWidth: 0 }}>
+          <div
+            style={{
+              width: 36,
+              height: 36,
+              borderRadius: 11,
+              background: "rgba(255,255,255,0.16)",
+              border: "1px solid rgba(255,255,255,0.28)",
+              display: "inline-flex",
+              alignItems: "center",
+              justifyContent: "center",
+              color: "#fff",
+              flexShrink: 0,
+            }}
+          >
+            <CalendarIcon size={19} />
+          </div>
+          <div style={{ minWidth: 0 }}>
+            <h1 style={{ fontSize: 16, fontWeight: 700, color: "#fff", margin: 0, letterSpacing: "-0.01em", whiteSpace: "nowrap" }}>
+              Events Calendar
+            </h1>
+            <div className="hide-960" style={{ fontSize: 11, color: "rgba(255,255,255,0.72)", marginTop: 1, whiteSpace: "nowrap" }}>
+              Corporate events intelligence
+            </div>
+          </div>
           {ticker && (
-            <span
+            <HeaderChip className="hide-760">
+              <span style={{ width: 6, height: 6, background: "#fff", borderRadius: "50%" }} />
+              {ticker}
+              {tickerCompany && <span style={{ opacity: 0.85, fontWeight: 500, textTransform: "none" }}>· {tickerCompany}</span>}
+            </HeaderChip>
+          )}
+          <HeaderChip className="hide-1180">India · NSE / BSE</HeaderChip>
+        </div>
+        <div style={{ display: "flex", alignItems: "center", gap: 10, flexShrink: 0 }}>
+          {result && (
+            <div
+              className="hide-960"
               style={{
                 display: "inline-flex",
                 alignItems: "center",
-                gap: 6,
-                padding: "2px 10px",
-                background: tokens.primaryLight,
-                color: tokens.primaryText,
-                borderRadius: 99,
-                fontSize: 12,
+                gap: 7,
+                fontSize: 11.5,
                 fontWeight: 600,
-                border: `1px solid ${tokens.primaryBorder}`,
+                color: "rgba(255,255,255,0.9)",
+                padding: "5px 11px",
+                background: "rgba(255,255,255,0.12)",
+                border: "1px solid rgba(255,255,255,0.2)",
+                borderRadius: 99,
+                whiteSpace: "nowrap",
               }}
             >
-              <span style={{ width: 6, height: 6, background: tokens.primary, borderRadius: "50%" }} />
-              {ticker}
-              {tickerCompany && <span style={{ color: "#818cf8", fontWeight: 400 }}>· {tickerCompany}</span>}
-            </span>
+              <span
+                style={{
+                  width: 7,
+                  height: 7,
+                  borderRadius: "50%",
+                  background: result.live ? "#4ade80" : "#fbbf24",
+                  boxShadow: result.live ? "0 0 0 3px rgba(74,222,128,0.3)" : "none",
+                }}
+              />
+              {result.live ? "Live" : "Sample"} · synced {syncedTime}
+            </div>
           )}
-          <span
-            style={{
-              fontSize: 10,
-              fontWeight: 600,
-              textTransform: "uppercase",
-              letterSpacing: "0.05em",
-              padding: "2px 8px",
-              borderRadius: 6,
-              border: "1px solid #fde68a",
-              background: "#fffbeb",
-              color: "#d97706",
-            }}
-          >
-            India · NSE/BSE
-          </span>
-        </div>
-        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
           <ViewToggle view={view} onChange={setView} />
-          <button
-            style={{ ...actionBtn, display: "inline-flex", alignItems: "center", gap: 6 }}
-            onClick={() => void reload()}
-            disabled={loading}
-          >
+          <button style={headerBtn} onClick={() => void reload()} disabled={loading} title="Refresh data">
             <RefreshIcon size={14} /> {loading ? "Refreshing…" : "Refresh"}
           </button>
           <button
             aria-label="Toggle light/dark theme"
             title="Toggle theme"
             onClick={toggle}
-            style={{ ...actionBtn, width: 32, padding: 0, display: "inline-flex", alignItems: "center", justifyContent: "center" }}
+            style={{ ...headerBtn, width: 34, padding: 0, justifyContent: "center" }}
           >
             {isDark ? <SunIcon size={15} /> : <MoonIcon size={15} />}
           </button>
@@ -263,6 +320,7 @@ export default function App() {
                 <AgendaView
                   events={filtered}
                   diffs={diffs}
+                  selectedId={selected?.id}
                   onSelect={selectEvent}
                   isStarred={watchlist.has}
                   onToggleStar={watchlist.toggle}
