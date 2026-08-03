@@ -540,8 +540,7 @@ export function EventDetail({
             </div>
 
             {/* COMPANY MATERIALS — full-width polished module below; compact white summary cards */}
-            <div style={{ ...overviewModule, position: "relative", overflow: "hidden", padding: "13px 15px 15px" }}>
-              <span style={{ position: "absolute", top: 0, left: 0, right: 0, height: 3, background: accentGrad }} />
+            <div style={{ ...overviewModule, padding: "13px 15px 15px" }}>
               <div style={{ display: "flex", alignItems: "baseline", gap: 6, flexWrap: "wrap", marginBottom: 12 }}>
                 <span style={sectionTitle}>Company materials</span>
                 {source && <span style={{ fontSize: 11, fontWeight: 500, color: tokens.textHint }}>· via {source}</span>}
