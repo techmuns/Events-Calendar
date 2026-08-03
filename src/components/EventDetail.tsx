@@ -89,6 +89,10 @@ const chipBtn: CSSProperties = {
   textDecoration: "none",
 };
 
+// Filing cards carry a subtle fixed purple accent (soft left border + primary CTA).
+const FILING_PURPLE = "#7c3aed";
+const FILING_PURPLE_GRAD = "linear-gradient(135deg, #7c3aed 0%, #6d28d9 100%)";
+
 function LinkAction({ label, url }: { label: string; url: string }) {
   const l = label.toLowerCase();
   const Icon = /ppt|present|deck|slide/.test(l)
@@ -106,13 +110,14 @@ function LinkAction({ label, url }: { label: string; url: string }) {
   );
 }
 
-function DocumentCard({ f, accent }: { f: CompanyFiling; accent: string }) {
+function DocumentCard({ f }: { f: CompanyFiling }) {
   const cat = filingCategoryMeta[f.category];
   return (
     <div
       className="card-hover"
       style={{
         border: `1px solid ${tokens.border}`,
+        borderLeft: `3px solid ${FILING_PURPLE}`,
         borderRadius: 13,
         padding: 12,
         background: tokens.surface,
@@ -171,9 +176,9 @@ function DocumentCard({ f, accent }: { f: CompanyFiling; accent: string }) {
               ...chipBtn,
               flex: 1,
               color: "#fff",
-              background: `linear-gradient(135deg, ${accent} 0%, color-mix(in srgb, ${accent} 74%, #000) 100%)`,
+              background: FILING_PURPLE_GRAD,
               border: "none",
-              boxShadow: `0 1px 3px color-mix(in srgb, ${accent} 45%, transparent)`,
+              boxShadow: `0 1px 3px color-mix(in srgb, ${FILING_PURPLE} 45%, transparent)`,
             }}
           >
             <ExternalLinkIcon size={13} /> Open Filing
@@ -190,6 +195,7 @@ function ConcallCard({ f }: { f: CompanyFiling }) {
       className="card-hover"
       style={{
         border: `1px solid ${tokens.border}`,
+        borderLeft: `3px solid ${FILING_PURPLE}`,
         borderRadius: 13,
         padding: 12,
         background: tokens.surface,
@@ -307,12 +313,26 @@ export function EventDetail({
     ...(event.indices.length > 0 ? [{ label: "Index", value: event.indices.join(", ") }] : []),
   ];
 
-  // Soft, full-width section module used to stack the Overview sections vertically.
-  const sectionModule: CSSProperties = {
-    background: tokens.surface2,
+  // Event Details sits in a single soft WHITE card — no bulky grey container.
+  const detailsCard: CSSProperties = {
+    background: tokens.surface,
     border: `1px solid ${tokens.border}`,
     borderRadius: 14,
-    padding: "13px 15px 15px",
+    boxShadow: tokens.shadowCard,
+    padding: "4px 14px 5px",
+  };
+  // Compact white summary card for a Company Materials tile.
+  const materialCard: CSSProperties = {
+    display: "flex",
+    alignItems: "center",
+    gap: 10,
+    padding: "11px 12px",
+    borderRadius: 12,
+    cursor: "pointer",
+    textAlign: "left",
+    border: `1px solid ${tokens.border}`,
+    background: tokens.surface,
+    boxShadow: tokens.shadowCard,
   };
   const sectionTitle: CSSProperties = {
     fontSize: 11,
@@ -512,25 +532,27 @@ export function EventDetail({
       {/* Content */}
       <div style={{ flex: 1, minHeight: 0, overflow: "auto", padding: 16, background: tokens.cardBodyBg }}>
         {tab === "overview" ? (
-          <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
-            {/* EVENT DETAILS — full-width module, shown first */}
-            <section style={sectionModule}>
-              <div style={{ ...sectionTitle, marginBottom: 4 }}>Event details</div>
-              {detailRows.map((r, i) => (
-                <Field key={r.label} label={r.label} value={r.value} last={i === detailRows.length - 1} />
-              ))}
-            </section>
+          <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+            {/* EVENT DETAILS — full width, first, in one soft white card */}
+            <div>
+              <div style={{ ...sectionTitle, marginBottom: 8 }}>Event details</div>
+              <div style={detailsCard}>
+                {detailRows.map((r, i) => (
+                  <Field key={r.label} label={r.label} value={r.value} last={i === detailRows.length - 1} />
+                ))}
+              </div>
+            </div>
 
-            {/* COMPANY MATERIALS — full-width module stacked below Event details */}
-            <section style={sectionModule}>
-              <div style={{ display: "flex", alignItems: "baseline", gap: 6, flexWrap: "wrap", marginBottom: 11 }}>
+            {/* COMPANY MATERIALS — full width below; compact white summary cards, no grey box */}
+            <div>
+              <div style={{ display: "flex", alignItems: "baseline", gap: 6, flexWrap: "wrap", marginBottom: 10 }}>
                 <span style={sectionTitle}>Company materials</span>
                 {source && <span style={{ fontSize: 11, fontWeight: 500, color: tokens.textHint }}>· via {source}</span>}
               </div>
               {loading ? (
-                <div style={{ display: "flex", flexDirection: "column", gap: 7 }}>
-                  {Array.from({ length: 3 }).map((_, i) => (
-                    <div key={i} className="shimmer" style={{ height: 46, borderRadius: 12 }} />
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
+                  {Array.from({ length: 4 }).map((_, i) => (
+                    <div key={i} className="shimmer" style={{ height: 58, borderRadius: 12 }} />
                   ))}
                 </div>
               ) : activeCats.length === 0 ? (
@@ -543,23 +565,7 @@ export function EventDetail({
                     const m = filingCategoryMeta[c];
                     const Icon = TAB_ICON[c];
                     return (
-                      <button
-                        key={c}
-                        onClick={() => setTab(c)}
-                        className="card-hover"
-                        style={{
-                          display: "flex",
-                          alignItems: "center",
-                          gap: 10,
-                          padding: "11px 12px",
-                          borderRadius: 12,
-                          cursor: "pointer",
-                          textAlign: "left",
-                          border: `1px solid ${tokens.border}`,
-                          background: tokens.surface,
-                          boxShadow: tokens.shadowCard,
-                        }}
-                      >
+                      <button key={c} onClick={() => setTab(c)} className="card-hover" style={materialCard}>
                         <span
                           style={{
                             width: 32,
@@ -587,11 +593,11 @@ export function EventDetail({
                   })}
                 </div>
               )}
-            </section>
+            </div>
 
-            {/* Other upcoming events — same module framing (concept unchanged) */}
+            {/* Other upcoming events — same compact white-card language */}
             {others.length > 0 && (
-              <section style={sectionModule}>
+              <div>
                 <div style={{ ...sectionTitle, marginBottom: 9 }}>Other upcoming events</div>
                 <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
                   {others.map((o) => {
@@ -620,7 +626,7 @@ export function EventDetail({
                     );
                   })}
                 </div>
-              </section>
+              </div>
             )}
           </div>
         ) : loading ? (
@@ -634,8 +640,35 @@ export function EventDetail({
         ) : (
           <div style={{ display: "flex", flexDirection: "column", gap: 9 }}>
             {byCat[tab].map((f, i) =>
-              f.links && f.links.length ? <ConcallCard key={i} f={f} /> : <DocumentCard key={i} f={f} accent={accent} />,
+              f.links && f.links.length ? <ConcallCard key={i} f={f} /> : <DocumentCard key={i} f={f} />,
             )}
+            {(() => {
+              const viewAllUrl = event.sourceUrl ?? byCat[tab].find((f) => f.url)?.url;
+              return viewAllUrl ? (
+                <a
+                  href={viewAllUrl}
+                  target="_blank"
+                  rel="noreferrer"
+                  style={{
+                    display: "inline-flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    gap: 6,
+                    marginTop: 2,
+                    padding: "9px 12px",
+                    borderRadius: 10,
+                    fontSize: 12.5,
+                    fontWeight: 600,
+                    textDecoration: "none",
+                    color: FILING_PURPLE,
+                    background: `color-mix(in srgb, ${FILING_PURPLE} 8%, transparent)`,
+                    border: `1px solid color-mix(in srgb, ${FILING_PURPLE} 26%, transparent)`,
+                  }}
+                >
+                  View all {TAB_LABEL[tab].toLowerCase()} <ExternalLinkIcon size={13} />
+                </a>
+              ) : null;
+            })()}
           </div>
         )}
       </div>
