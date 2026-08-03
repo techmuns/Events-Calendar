@@ -65,13 +65,23 @@ export function DensityCard({
 
   return (
     <div style={card}>
-      <div
+      <button
+        onClick={() => setOpen(!open)}
+        aria-expanded={open}
+        title={open ? "Hide the density chart" : "Show the density chart"}
         style={{
+          width: "100%",
           display: "flex",
           alignItems: "center",
           gap: 12,
           padding: "12px 16px",
+          border: "none",
           borderBottom: open ? `1px solid ${tokens.border}` : "none",
+          background: "transparent",
+          cursor: "pointer",
+          textAlign: "left",
+          font: "inherit",
+          color: "inherit",
         }}
       >
         <span
@@ -106,10 +116,8 @@ export function DensityCard({
           </div>
         </div>
         <span style={{ flex: 1 }} />
-        <button style={toggleBtn} onClick={() => setOpen(!open)}>
-          {open ? "Hide" : "Show insights"}
-        </button>
-      </div>
+        <span style={toggleBtn}>{open ? "Hide" : "Show insights"}</span>
+      </button>
 
       {open && (
         <div style={{ padding: "14px 16px 16px" }}>
