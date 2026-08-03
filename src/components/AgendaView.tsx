@@ -96,7 +96,7 @@ function EventRow({
   selected,
 }: { e: CorporateEvent; diff?: EventDiff; selected: boolean } & RowHandlers) {
   const starred = isStarred(e.ticker);
-  const accent = eventTypeMeta[e.eventType].hex;
+  const accent = companyAccent(e.ticker || e.company);
   const status = statusMeta[e.status];
   const row: CSSProperties = {
     position: "relative",
@@ -104,9 +104,11 @@ function EventRow({
     alignItems: "center",
     gap: 12,
     padding: "10px 14px 10px 18px",
-    borderBottom: `1px solid ${tokens.border}`,
+    borderBottom: `1px solid ${selected ? tokens.borderStrong : tokens.border}`,
     cursor: "pointer",
-    background: selected ? tokens.primaryLight : "transparent",
+    background: selected
+      ? `linear-gradient(90deg, color-mix(in srgb, ${accent} 18%, transparent) 0%, color-mix(in srgb, ${accent} 7%, transparent) 100%)`
+      : "transparent",
   };
   const stop = (fn: () => void) => (ev: { stopPropagation: () => void }) => {
     ev.stopPropagation();
@@ -134,13 +136,14 @@ function EventRow({
           cursor: "pointer",
           border: "none",
           background: "transparent",
-          padding: 2,
+          padding: 6,
+          borderRadius: 8,
           color: starred ? "#f59e0b" : tokens.textHint,
           display: "inline-flex",
           flexShrink: 0,
         }}
       >
-        <StarIcon size={16} filled={starred} />
+        <StarIcon size={17} filled={starred} />
       </button>
       <DateBlock iso={e.date} accent={accent} />
       <Avatar name={e.company} seed={e.ticker || e.company} />
@@ -216,8 +219,8 @@ function EventRow({
               display: "inline-flex",
               alignItems: "center",
               justifyContent: "center",
-              width: 28,
-              height: 28,
+              width: 30,
+              height: 30,
               borderRadius: 8,
               color: tokens.textMuted,
               border: `1px solid ${tokens.border}`,
@@ -225,7 +228,7 @@ function EventRow({
               flexShrink: 0,
             }}
           >
-            <ExternalLinkIcon size={13} />
+            <ExternalLinkIcon size={14} />
           </a>
         )}
       </div>

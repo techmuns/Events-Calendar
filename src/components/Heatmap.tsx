@@ -61,13 +61,14 @@ export function computeDensity(events: CorporateEvent[]): { days: Day[]; max: nu
   return { days, max, busiest };
 }
 
-// Vertical bar gradients, low → high, plus Today (blue) and the peak/selected purple.
+// Vertical bar gradients, low → high, plus Today (blue) and the peak/selected
+// purple. Theme-aware via CSS vars (light pastels / deep-navy dark).
 const BAR = {
-  low: "linear-gradient(180deg, #c9cfec 0%, #a6aedc 100%)",
-  med: "linear-gradient(180deg, #7c83ff 0%, #4f46e5 100%)",
-  high: "linear-gradient(180deg, #9b5cff 0%, #7c3aed 100%)",
-  peak: "linear-gradient(180deg, #8b5cf6 0%, #5b21b6 100%)",
-  today: "linear-gradient(180deg, #60a5fa 0%, #2563eb 100%)",
+  low: "var(--bar-low)",
+  med: "var(--bar-med)",
+  high: "var(--bar-high)",
+  peak: "var(--bar-peak)",
+  today: "var(--bar-today)",
 };
 
 export function Heatmap({
@@ -85,8 +86,33 @@ export function Heatmap({
 
   return (
     <div>
-      <div style={{ display: "flex", gap: 5, overflowX: "auto", alignItems: "flex-end", paddingBottom: 2 }}>
-        {days.map((d, i) => {
+      <div style={{ position: "relative" }}>
+        {/* faint horizontal guide lines behind the bars */}
+        <div
+          aria-hidden
+          style={{
+            position: "absolute",
+            left: 0,
+            right: 0,
+            top: 16,
+            bottom: 42,
+            pointerEvents: "none",
+            backgroundImage:
+              "repeating-linear-gradient(to top, var(--density-grid) 0, var(--density-grid) 1px, transparent 1px, transparent 27px)",
+          }}
+        />
+        <div
+          style={{
+            position: "relative",
+            zIndex: 1,
+            display: "flex",
+            gap: 5,
+            overflowX: "auto",
+            alignItems: "flex-end",
+            paddingBottom: 2,
+          }}
+        >
+          {days.map((d, i) => {
           const selected = selectedDay === d.iso;
           const isToday = i === 0;
           const firstOfMonth = d.date.getDate() === 1;
@@ -196,6 +222,7 @@ export function Heatmap({
             </button>
           );
         })}
+        </div>
       </div>
 
       {/* Gradient legend + click hint */}

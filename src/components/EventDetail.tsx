@@ -314,7 +314,7 @@ export function EventDetail({
     color: active ? "#fff" : tokens.textMuted,
     fontSize: 12,
     fontWeight: 600,
-    padding: "6px 11px",
+    padding: "6px 10px",
     borderRadius: 9,
     whiteSpace: "nowrap",
     boxShadow: active ? accentShadow : "none",
@@ -366,7 +366,19 @@ export function EventDetail({
             {initials(event.company)}
           </span>
           <div style={{ minWidth: 0 }}>
-            <div style={{ fontSize: 16.5, fontWeight: 800, color: tokens.textPrimary, letterSpacing: "-0.01em", lineHeight: 1.2 }}>
+            <div
+              style={{
+                fontSize: 16.5,
+                fontWeight: 800,
+                color: tokens.textPrimary,
+                letterSpacing: "-0.01em",
+                lineHeight: 1.2,
+                display: "-webkit-box",
+                WebkitLineClamp: 2,
+                WebkitBoxOrient: "vertical",
+                overflow: "hidden",
+              }}
+            >
               {event.company}
             </div>
             <div style={{ fontSize: 12, color: tokens.textMuted, marginTop: 1 }}>
@@ -444,9 +456,9 @@ export function EventDetail({
         style={{
           flexShrink: 0,
           display: "flex",
-          gap: 4,
-          padding: "9px 12px",
-          overflowX: "auto",
+          flexWrap: "wrap",
+          gap: 5,
+          padding: "9px 11px",
           borderBottom: `1px solid ${tokens.border}`,
           background: tokens.cardHeaderBg,
         }}
