@@ -49,6 +49,12 @@
 
   /* Details-panel company header — same 110deg linear treatment as the KPIs */
   --detail-header-bg: linear-gradient(110deg, #eef4ff 0%, #f4f7ff 50%, #fcfdff 100%);
+
+  /* Density chart */
+  --density-panel-bg: linear-gradient(180deg, #ffffff 0%, #fafaff 55%, #f7f8ff 100%);
+  --density-panel-bd: #e8eafc;
+  --density-selected: #7c3aed;
+  --density-today: #2563eb;
 }
 
 /* Dark theme — explicit [data-theme="dark"] or system preference. */
@@ -92,6 +98,10 @@
   --kpi4-bg: linear-gradient(110deg, #131a2b 0%, #122318 55%, #123526 100%);
   --kpi4-bd: #1e4231;
   --detail-header-bg: linear-gradient(110deg, #182136 0%, #151d30 50%, #131a2b 100%);
+  --density-panel-bg: linear-gradient(180deg, #10182a 0%, #0f1830 100%);
+  --density-panel-bd: #232d48;
+  --density-selected: #a78bfa;
+  --density-today: #60a5fa;
 }
 
 @media (prefers-color-scheme: dark) {

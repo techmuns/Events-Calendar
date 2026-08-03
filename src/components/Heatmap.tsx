@@ -2,16 +2,15 @@ import { useState } from "react";
 import type { CorporateEvent } from "../types";
 import { tokens } from "../theme";
 import { addDays, diffDays, parseISO, toISO, todayStart } from "../lib/dates";
+import { CursorIcon } from "./icons";
 
 const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
 const WEEKDAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 
 // Quarterly results cluster over ~45-60 days, so the strip is one bar per day.
-// The window hugs the actual data (today → last event) but is clamped so it is
-// never a lonely few bars nor an endless scroll.
 const MIN_DAYS = 21;
 const MAX_DAYS = 60;
-const BAR_AREA = 96; // px, tallest bar
+const BAR_AREA = 108; // px, tallest bar
 
 export interface Day {
   date: Date;
@@ -62,13 +61,14 @@ export function computeDensity(events: CorporateEvent[]): { days: Day[]; max: nu
   return { days, max, busiest };
 }
 
-// Blue → violet with the number of events; weekends muted grey.
-function barColor(d: Day, max: number): string {
-  if (d.count === 0) return `color-mix(in srgb, ${tokens.textHint} 14%, transparent)`;
-  if (d.weekend) return `color-mix(in srgb, ${tokens.textHint} ${Math.round(35 + 30 * (d.count / max))}%, transparent)`;
-  const t = Math.round((d.count / max) * 100);
-  return `color-mix(in srgb, #7c3aed ${t}%, #2563eb)`;
-}
+// Vertical bar gradients, low → high, plus Today (blue) and the peak/selected purple.
+const BAR = {
+  low: "linear-gradient(180deg, #c9cfec 0%, #a6aedc 100%)",
+  med: "linear-gradient(180deg, #7c83ff 0%, #4f46e5 100%)",
+  high: "linear-gradient(180deg, #9b5cff 0%, #7c3aed 100%)",
+  peak: "linear-gradient(180deg, #8b5cf6 0%, #5b21b6 100%)",
+  today: "linear-gradient(180deg, #60a5fa 0%, #2563eb 100%)",
+};
 
 export function Heatmap({
   events,
@@ -79,189 +79,147 @@ export function Heatmap({
   selectedDay?: string | null;
   onSelectDay?: (dayISO: string | null) => void;
 }) {
-  const { days, max, busiest } = computeDensity(events);
-  const valThreshold = Math.max(10, max * 0.3);
+  const { days, max } = computeDensity(events);
+  const labelThreshold = Math.max(10, max * 0.45);
   const [hover, setHover] = useState<{ day: Day; x: number; y: number } | null>(null);
 
   return (
-    <div style={{ display: "flex", gap: 20, padding: "10px 6px 6px", flexWrap: "wrap" }}>
-      {/* Daily bar strip */}
-      <div style={{ flex: "1 1 460px", minWidth: 0 }}>
-        <div style={{ display: "flex", gap: 4, overflowX: "auto", paddingBottom: 4, alignItems: "flex-end" }}>
-          {days.map((d, i) => {
-            const h = 3 + (d.count / max) * BAR_AREA;
-            const selected = selectedDay === d.iso;
-            const isToday = i === 0;
-            const firstOfMonth = d.date.getDate() === 1;
-            return (
-              <button
-                key={d.iso}
-                onClick={() => onSelectDay?.(selected ? null : d.iso)}
-                onMouseMove={(e) => setHover({ day: d, x: e.clientX, y: e.clientY })}
-                onMouseLeave={() => setHover((h) => (h?.day.iso === d.iso ? null : h))}
-                style={{
-                  flex: "1 0 16px",
-                  maxWidth: 42,
-                  display: "flex",
-                  flexDirection: "column",
-                  alignItems: "center",
-                  justifyContent: "flex-end",
-                  gap: 4,
-                  cursor: onSelectDay ? "pointer" : "default",
-                  border: "none",
-                  background: "transparent",
-                  padding: 0,
-                  borderLeft: firstOfMonth ? `1px dashed ${tokens.borderStrong}` : "none",
-                  height: BAR_AREA + 42,
-                }}
-              >
-                <span style={{ fontSize: 10, fontWeight: 700, color: tokens.textSecondary, height: 13, lineHeight: "13px" }}>
-                  {d.count >= valThreshold ? d.count : ""}
-                </span>
+    <div>
+      <div style={{ display: "flex", gap: 5, overflowX: "auto", alignItems: "flex-end", paddingBottom: 2 }}>
+        {days.map((d, i) => {
+          const selected = selectedDay === d.iso;
+          const isToday = i === 0;
+          const firstOfMonth = d.date.getDate() === 1;
+          const zero = d.count === 0;
+          const ratio = d.count / max;
+          const isPeak = d.count === max && d.count > 0;
+          const h = Math.max(10, 6 + ratio * BAR_AREA);
+
+          let bg = BAR.low;
+          if (selected) bg = BAR.peak;
+          else if (isToday) bg = BAR.today;
+          else if (isPeak) bg = BAR.peak;
+          else if (ratio >= 0.66) bg = BAR.high;
+          else if (ratio >= 0.33) bg = BAR.med;
+
+          const showVal = !zero && (d.count >= labelThreshold || selected || isPeak);
+          const labelColor = selected
+            ? "var(--density-selected)"
+            : isToday
+              ? "var(--density-today)"
+              : tokens.textMuted;
+
+          return (
+            <button
+              key={d.iso}
+              onClick={() => onSelectDay?.(selected ? null : d.iso)}
+              onMouseMove={(e) => setHover({ day: d, x: e.clientX, y: e.clientY })}
+              onMouseLeave={() => setHover((h) => (h?.day.iso === d.iso ? null : h))}
+              style={{
+                flex: "1 0 18px",
+                maxWidth: 46,
+                display: "flex",
+                flexDirection: "column",
+                alignItems: "center",
+                justifyContent: "flex-end",
+                gap: 3,
+                cursor: onSelectDay ? "pointer" : "default",
+                border: "none",
+                background: "transparent",
+                padding: 0,
+                height: BAR_AREA + 60,
+              }}
+            >
+              <span style={{ fontSize: 10.5, fontWeight: 800, color: tokens.textPrimary, height: 14, lineHeight: "14px" }}>
+                {showVal ? d.count : ""}
+              </span>
+
+              {zero ? (
+                <span
+                  style={{
+                    width: "62%",
+                    minWidth: 8,
+                    height: 9,
+                    borderRadius: 5,
+                    border: `1.5px dashed ${tokens.borderStrong}`,
+                    background: "transparent",
+                  }}
+                />
+              ) : (
                 <span
                   style={{
                     width: "100%",
-                    minWidth: 8,
+                    minWidth: 9,
                     height: h,
-                    borderRadius: "5px 5px 2px 2px",
-                    background: barColor(d, max),
-                    outline: selected ? "2px solid #0f172a" : isToday ? `2px solid ${tokens.primaryBorder}` : "none",
+                    borderRadius: "7px 7px 2px 2px",
+                    background: bg,
+                    outline: selected ? "2px solid #c4b5fd" : "none",
                     outlineOffset: 2,
-                    boxShadow: selected ? "0 0 0 4px rgba(79,70,229,0.2)" : "none",
-                    transition: "filter 0.15s",
-                    filter: hover?.day.iso === d.iso ? "brightness(1.12)" : "none",
+                    boxShadow: selected ? "0 0 12px rgba(124,58,237,0.45)" : "none",
+                    filter: hover?.day.iso === d.iso ? "brightness(1.08)" : "none",
+                    transition: "filter 0.15s ease",
                   }}
                 />
-                <span
-                  style={{
-                    fontSize: 9.5,
-                    lineHeight: 1.15,
-                    textAlign: "center",
-                    color: isToday || selected ? tokens.primaryText : tokens.textHint,
-                    fontWeight: isToday || selected || firstOfMonth ? 700 : 400,
-                    whiteSpace: "nowrap",
-                  }}
-                >
-                  {isToday ? "Today" : d.date.getDate()}
-                  {firstOfMonth && !isToday && (
-                    <>
-                      <br />
-                      {MONTHS[d.date.getMonth()]}
-                    </>
-                  )}
-                </span>
-              </button>
-            );
-          })}
-        </div>
-        <div style={{ marginTop: 8, fontSize: 11.5, color: tokens.textMuted, display: "flex", alignItems: "center", gap: 8 }}>
-          <span style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
-            <span style={{ width: 22, height: 8, borderRadius: 3, background: "linear-gradient(90deg,#2563eb,#7c3aed)" }} />
-            fewer → more events
-          </span>
-          <span style={{ color: tokens.textHint }}>·</span>
-          {selectedDay ? (
-            <span>
-              Filtered to <span style={{ fontWeight: 600, color: tokens.textSecondary }}>{dayLabel(parseISO(selectedDay))}</span>
-              {" "}· click again to clear
-            </span>
-          ) : (
-            <span>click any day to filter</span>
-          )}
-        </div>
-      </div>
+              )}
 
-      {/* Busiest days ahead — ranked cards with gradient progress */}
-      {busiest.length > 0 && (
-        <div style={{ flex: "0 1 250px", minWidth: 210 }}>
-          <div
-            style={{
-              fontSize: 10,
-              fontWeight: 700,
-              textTransform: "uppercase",
-              letterSpacing: "0.05em",
-              color: tokens.textHint,
-              marginBottom: 9,
-            }}
-          >
-            Busiest days ahead
-          </div>
-          <div style={{ display: "flex", flexDirection: "column", gap: 7 }}>
-            {busiest.map((d, i) => {
-              const selected = selectedDay === d.iso;
-              return (
-                <button
-                  key={d.iso}
-                  onClick={() => onSelectDay?.(selected ? null : d.iso)}
-                  title={`Filter to ${dayLabel(d.date)}`}
-                  className="card-hover"
-                  style={{
-                    display: "flex",
-                    alignItems: "center",
-                    gap: 11,
-                    padding: "8px 11px",
-                    borderRadius: 12,
-                    cursor: "pointer",
-                    textAlign: "left",
-                    border: `1px solid ${selected ? tokens.primaryBorder : tokens.border}`,
-                    background: selected ? tokens.primaryLight : tokens.surface,
-                    boxShadow: tokens.shadowCard,
-                  }}
-                >
+              {/* selection caret row (fixed height keeps every baseline aligned) */}
+              <span style={{ height: 7, display: "flex", alignItems: "center" }}>
+                {selected && (
                   <span
                     style={{
-                      flexShrink: 0,
-                      width: 22,
-                      height: 22,
-                      borderRadius: 7,
-                      display: "inline-flex",
-                      alignItems: "center",
-                      justifyContent: "center",
-                      fontSize: 11,
-                      fontWeight: 800,
-                      color: i === 0 ? "#fff" : tokens.textMuted,
-                      background: i === 0 ? tokens.gradientBrand : tokens.surface2,
-                      border: i === 0 ? "none" : `1px solid ${tokens.border}`,
+                      width: 0,
+                      height: 0,
+                      borderLeft: "5px solid transparent",
+                      borderRight: "5px solid transparent",
+                      borderTop: "6px solid var(--density-selected)",
                     }}
-                  >
-                    {i + 1}
-                  </span>
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", gap: 6 }}>
-                      <span style={{ fontSize: 12.5, fontWeight: 600, color: tokens.textSecondary, whiteSpace: "nowrap" }}>
-                        {dayLabel(d.date)}
-                      </span>
-                      <span style={{ fontSize: 13, fontWeight: 800, color: tokens.primaryText }}>{d.count}</span>
-                    </div>
-                    <span
-                      style={{
-                        display: "block",
-                        marginTop: 5,
-                        height: 6,
-                        background: tokens.surface2,
-                        borderRadius: 4,
-                        overflow: "hidden",
-                      }}
-                    >
-                      <span
-                        style={{
-                          display: "block",
-                          height: "100%",
-                          width: `${(d.count / max) * 100}%`,
-                          background: tokens.gradientBrand,
-                          borderRadius: 4,
-                        }}
-                      />
-                    </span>
-                  </div>
-                </button>
-              );
-            })}
-          </div>
-        </div>
-      )}
+                  />
+                )}
+              </span>
 
-      {/* Floating tooltip with the day's event-type breakdown */}
+              <span
+                style={{
+                  fontSize: 10,
+                  lineHeight: 1.15,
+                  textAlign: "center",
+                  color: labelColor,
+                  fontWeight: selected || isToday || firstOfMonth ? 700 : 500,
+                  whiteSpace: "nowrap",
+                }}
+              >
+                {isToday ? "Today" : d.date.getDate()}
+                <br />
+                <span style={{ fontSize: 8.5, color: firstOfMonth ? tokens.textHint : "transparent" }}>
+                  {firstOfMonth ? MONTHS[d.date.getMonth()] : "·"}
+                </span>
+              </span>
+            </button>
+          );
+        })}
+      </div>
+
+      {/* Gradient legend + click hint */}
+      <div style={{ display: "flex", alignItems: "center", gap: 10, marginTop: 12, flexWrap: "wrap" }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+          <span style={{ fontSize: 11, color: tokens.textMuted }}>Fewer events</span>
+          <span
+            style={{
+              width: 128,
+              height: 8,
+              borderRadius: 5,
+              background: "linear-gradient(90deg, #dce3f0 0%, #a5b4fc 35%, #6366f1 65%, #7c3aed 100%)",
+              border: `1px solid ${tokens.border}`,
+            }}
+          />
+          <span style={{ fontSize: 11, color: tokens.textMuted }}>More events</span>
+        </div>
+        <span style={{ flex: 1 }} />
+        <span style={{ display: "inline-flex", alignItems: "center", gap: 6, fontSize: 11.5, color: tokens.textHint }}>
+          <CursorIcon size={13} /> Click any day to filter events
+        </span>
+      </div>
+
+      {/* Hover tooltip */}
       {hover && (
         <div
           style={{
@@ -273,34 +231,37 @@ export function Heatmap({
             background: "#0f172a",
             color: "#fff",
             borderRadius: 10,
-            padding: "8px 11px",
-            boxShadow: "0 10px 24px rgba(15,23,42,0.35)",
+            padding: "9px 12px",
+            boxShadow: "0 10px 26px rgba(15,23,42,0.38)",
             fontSize: 11.5,
-            minWidth: 150,
+            minWidth: 168,
           }}
         >
-          <div style={{ fontWeight: 700, marginBottom: 3 }}>{dayLabel(hover.day.date)}</div>
+          <div style={{ fontWeight: 700, marginBottom: 5 }}>{dayLabel(hover.day.date)}</div>
+          <TipRow color="#a5b4fc" label="Total events" value={hover.day.count} strong />
           {hover.day.count === 0 ? (
-            <div style={{ color: "#cbd5e1" }}>No events</div>
+            <div style={{ color: "#94a3b8" }}>No events scheduled</div>
           ) : (
             <>
-              <div style={{ display: "flex", alignItems: "center", gap: 6, color: "#e2e8f0" }}>
-                <span style={{ width: 7, height: 7, borderRadius: "50%", background: "#60a5fa" }} />
-                {hover.day.earnings} earnings
-              </div>
-              {hover.day.demerger > 0 && (
-                <div style={{ display: "flex", alignItems: "center", gap: 6, color: "#e2e8f0", marginTop: 2 }}>
-                  <span style={{ width: 7, height: 7, borderRadius: "50%", background: "#fbbf24" }} />
-                  {hover.day.demerger} corporate action{hover.day.demerger === 1 ? "" : "s"}
-                </div>
-              )}
-              <div style={{ marginTop: 4, paddingTop: 4, borderTop: "1px solid rgba(255,255,255,0.15)", color: "#94a3b8" }}>
-                {hover.day.count} total · click to filter
+              <TipRow color="#60a5fa" label="Earnings" value={hover.day.earnings} />
+              {hover.day.demerger > 0 && <TipRow color="#fbbf24" label="Corporate actions" value={hover.day.demerger} />}
+              <div style={{ marginTop: 5, paddingTop: 5, borderTop: "1px solid rgba(255,255,255,0.14)", color: "#94a3b8", fontSize: 10.5 }}>
+                Click to filter events to this day
               </div>
             </>
           )}
         </div>
       )}
+    </div>
+  );
+}
+
+function TipRow({ color, label, value, strong }: { color: string; label: string; value: number; strong?: boolean }) {
+  return (
+    <div style={{ display: "flex", alignItems: "center", gap: 7, marginTop: 2 }}>
+      <span style={{ width: 7, height: 7, borderRadius: "50%", background: color, flexShrink: 0 }} />
+      <span style={{ color: "#e2e8f0", flex: 1 }}>{label}</span>
+      <span style={{ fontWeight: strong ? 800 : 600, color: "#fff" }}>{value}</span>
     </div>
   );
 }

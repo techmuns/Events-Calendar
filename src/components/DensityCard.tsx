@@ -3,7 +3,7 @@ import type { CSSProperties } from "react";
 import type { CorporateEvent } from "../types";
 import { tokens } from "../theme";
 import { Heatmap, computeDensity, dayLabel, type Day } from "./Heatmap";
-import { ChevronRightIcon } from "./icons";
+import { BarChartIcon, SparkIcon } from "./icons";
 
 // Remember whether the density chart is expanded, across reloads.
 function usePersistedOpen(key: string, def: boolean): [boolean, (v: boolean) => void] {
@@ -27,29 +27,24 @@ function usePersistedOpen(key: string, def: boolean): [boolean, (v: boolean) => 
 
 function MiniBars({ days, max }: { days: Day[]; max: number }) {
   return (
-    <span style={{ display: "inline-flex", alignItems: "flex-end", gap: 1.5, height: 18 }}>
-      {days.slice(0, 30).map((d, i) => (
-        <span
-          key={i}
-          style={{
-            width: 3,
-            height: Math.max(2, (d.count / max) * 18),
-            borderRadius: 1,
-            background:
-              d.count === 0
-                ? `color-mix(in srgb, ${tokens.textHint} 22%, transparent)`
-                : d.weekend
-                  ? `color-mix(in srgb, ${tokens.textHint} 55%, transparent)`
-                  : tokens.primary,
-          }}
-        />
-      ))}
+    <span style={{ display: "inline-flex", alignItems: "flex-end", gap: 1.5, height: 20 }}>
+      {days.slice(0, 30).map((d, i) => {
+        const r = d.count / max;
+        const bg =
+          d.count === 0
+            ? `color-mix(in srgb, ${tokens.textHint} 22%, transparent)`
+            : r >= 0.66
+              ? "#7c3aed"
+              : r >= 0.33
+                ? "#4f46e5"
+                : "#a6aedc";
+        return <span key={i} style={{ width: 3, height: Math.max(2, r * 20), borderRadius: 1, background: bg }} />;
+      })}
     </span>
   );
 }
 
-// The "Earnings-season density" chart, collapsed to a one-line summary by
-// default (peak day + mini preview) so it never dominates the dashboard.
+// The "Earnings-season density" chart — a collapsible premium panel.
 export function DensityCard({
   events,
   selectedDay,
@@ -67,69 +62,87 @@ export function DensityCard({
     background: tokens.cardBg,
     border: `1px solid ${tokens.border}`,
     borderRadius: 16,
-    boxShadow: "0 1px 4px rgba(0,0,0,0.04)",
+    boxShadow: tokens.shadowCard,
     overflow: "hidden",
     flexShrink: 0,
   };
 
+  const toggleBtn: CSSProperties = {
+    display: "inline-flex",
+    alignItems: "center",
+    gap: 6,
+    cursor: "pointer",
+    fontSize: 12,
+    fontWeight: 600,
+    padding: "6px 12px",
+    borderRadius: 9,
+    border: `1px solid ${open ? tokens.border : "color-mix(in srgb, #7c3aed 28%, transparent)"}`,
+    background: open ? tokens.surface : "color-mix(in srgb, #7c3aed 10%, transparent)",
+    color: open ? tokens.textSecondary : "#7c3aed",
+    whiteSpace: "nowrap",
+  };
+
   return (
     <div style={card}>
-      <button
-        onClick={() => setOpen(!open)}
+      <div
         style={{
-          width: "100%",
           display: "flex",
           alignItems: "center",
-          gap: 10,
-          padding: "10px 16px",
-          cursor: "pointer",
-          border: "none",
-          background: "transparent",
-          textAlign: "left",
+          gap: 12,
+          padding: "12px 16px",
           borderBottom: open ? `1px solid ${tokens.border}` : "none",
         }}
       >
         <span
           style={{
-            color: tokens.textMuted,
+            flexShrink: 0,
+            width: 34,
+            height: 34,
+            borderRadius: 10,
             display: "inline-flex",
-            transform: open ? "rotate(90deg)" : "none",
-            transition: "transform 0.15s",
+            alignItems: "center",
+            justifyContent: "center",
+            color: "#7c3aed",
+            background: "color-mix(in srgb, #7c3aed 12%, transparent)",
+            border: "1px solid color-mix(in srgb, #7c3aed 24%, transparent)",
           }}
         >
-          <ChevronRightIcon size={15} />
+          <BarChartIcon size={17} />
         </span>
-        <span style={{ fontSize: 13.5, fontWeight: 700, color: tokens.textPrimary }}>Earnings-season density</span>
-        {!open && peak && (
-          <span style={{ fontSize: 12, color: tokens.textMuted }}>
-            · peak{" "}
-            <span style={{ fontWeight: 600, color: tokens.primaryText }}>
-              {dayLabel(peak.date)} ({peak.count})
-            </span>
-          </span>
-        )}
+        <div style={{ minWidth: 0 }}>
+          <div style={{ fontSize: 14.5, fontWeight: 700, color: tokens.textPrimary, letterSpacing: "-0.01em" }}>
+            Earnings-season density
+          </div>
+          <div style={{ fontSize: 12, color: tokens.textMuted, marginTop: 1 }}>
+            {peak ? (
+              <>
+                Peak: <span style={{ fontWeight: 600, color: tokens.textSecondary }}>{dayLabel(peak.date)}</span> ({peak.count}{" "}
+                companies)
+              </>
+            ) : (
+              "No upcoming events in range"
+            )}
+          </div>
+        </div>
         <span style={{ flex: 1 }} />
-        {!open && selectedDay && (
-          <span
+        {!open && <MiniBars days={days} max={max} />}
+        <button style={toggleBtn} onClick={() => setOpen(!open)}>
+          {open ? "Hide" : <><SparkIcon size={13} /> Show insights</>}
+        </button>
+      </div>
+
+      {open && (
+        <div style={{ padding: "14px 16px 16px" }}>
+          <div
             style={{
-              fontSize: 11,
-              fontWeight: 600,
-              color: tokens.primaryText,
-              background: tokens.primaryLight,
-              border: `1px solid ${tokens.primaryBorder}`,
-              borderRadius: 99,
-              padding: "2px 8px",
+              background: "var(--density-panel-bg)",
+              border: "1px solid var(--density-panel-bd)",
+              borderRadius: 14,
+              padding: "16px 14px 12px",
             }}
           >
-            filtered
-          </span>
-        )}
-        {!open && <MiniBars days={days} max={max} />}
-        <span style={{ fontSize: 11.5, color: tokens.textHint, marginLeft: 2 }}>{open ? "Hide" : "Show"}</span>
-      </button>
-      {open && (
-        <div>
-          <Heatmap events={events} selectedDay={selectedDay} onSelectDay={onSelectDay} />
+            <Heatmap events={events} selectedDay={selectedDay} onSelectDay={onSelectDay} />
+          </div>
         </div>
       )}
     </div>

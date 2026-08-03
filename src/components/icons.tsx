@@ -212,6 +212,27 @@ export const SearchIcon = (p: P) => (
   </Svg>
 );
 
+export const BarChartIcon = (p: P) => (
+  <Svg {...p}>
+    <line x1="6" y1="20" x2="6" y2="13" />
+    <line x1="12" y1="20" x2="12" y2="7" />
+    <line x1="18" y1="20" x2="18" y2="10" />
+    <line x1="3" y1="20" x2="21" y2="20" />
+  </Svg>
+);
+
+export const CursorIcon = (p: P) => (
+  <Svg {...p}>
+    <path d="M3 3l7.5 18 2.4-7.1L20 11.5 3 3z" />
+  </Svg>
+);
+
+export const SparkIcon = (p: P) => (
+  <Svg {...p}>
+    <path d="M12 3v4M12 17v4M3 12h4M17 12h4M5.6 5.6l2.8 2.8M15.6 15.6l2.8 2.8M18.4 5.6l-2.8 2.8M8.4 15.6l-2.8 2.8" />
+  </Svg>
+);
+
 export const GridIcon = (p: P) => (
   <Svg {...p}>
     <rect x="3" y="3" width="7" height="7" rx="1" />
