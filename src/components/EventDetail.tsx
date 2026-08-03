@@ -247,9 +247,17 @@ function EmptyTab({ label }: { label: string }) {
   );
 }
 
-function Field({ label, value }: { label: string; value: string }) {
+function Field({ label, value, last }: { label: string; value: string; last?: boolean }) {
   return (
-    <div style={{ display: "flex", justifyContent: "space-between", gap: 12, padding: "9px 0", borderBottom: `1px solid ${tokens.border}` }}>
+    <div
+      style={{
+        display: "flex",
+        justifyContent: "space-between",
+        gap: 12,
+        padding: "9px 0",
+        borderBottom: last ? "none" : `1px solid ${tokens.border}`,
+      }}
+    >
       <span style={{ fontSize: 12.5, color: tokens.textHint }}>{label}</span>
       <span style={{ fontSize: 13, fontWeight: 600, color: tokens.textSecondary, textAlign: "right" }}>{value}</span>
     </div>
@@ -289,6 +297,30 @@ export function EventDetail({
   const others = allEvents
     .filter((e) => e.ticker === event.ticker && e.id !== event.id)
     .sort((a, b) => a.date.localeCompare(b.date));
+
+  // Overview "Event details" rows, built so we can drop the divider on the last one.
+  const detailRows = [
+    { label: "Date", value: longDate(event.date) },
+    ...(event.time ? [{ label: "Time", value: event.time }] : []),
+    { label: "Exchange", value: event.exchange },
+    ...(event.sector ? [{ label: "Sector", value: event.sector }] : []),
+    ...(event.indices.length > 0 ? [{ label: "Index", value: event.indices.join(", ") }] : []),
+  ];
+
+  // Soft, full-width section module used to stack the Overview sections vertically.
+  const sectionModule: CSSProperties = {
+    background: tokens.surface2,
+    border: `1px solid ${tokens.border}`,
+    borderRadius: 14,
+    padding: "13px 15px 15px",
+  };
+  const sectionTitle: CSSProperties = {
+    fontSize: 11,
+    fontWeight: 700,
+    textTransform: "uppercase",
+    letterSpacing: "0.05em",
+    color: tokens.textHint,
+  };
 
   const headerChip: CSSProperties = {
     display: "inline-flex",
@@ -480,87 +512,87 @@ export function EventDetail({
       {/* Content */}
       <div style={{ flex: 1, minHeight: 0, overflow: "auto", padding: 16, background: tokens.cardBodyBg }}>
         {tab === "overview" ? (
-          <>
-            <div style={{ fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.05em", color: tokens.textHint, marginBottom: 4 }}>
-              Event details
-            </div>
-            <div style={{ marginBottom: 18 }}>
-              <Field label="Date" value={longDate(event.date)} />
-              {event.time && <Field label="Time" value={event.time} />}
-              <Field label="Exchange" value={event.exchange} />
-              {event.sector && <Field label="Sector" value={event.sector} />}
-              {event.indices.length > 0 && <Field label="Index" value={event.indices.join(", ")} />}
-            </div>
+          <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+            {/* EVENT DETAILS — full-width module, shown first */}
+            <section style={sectionModule}>
+              <div style={{ ...sectionTitle, marginBottom: 4 }}>Event details</div>
+              {detailRows.map((r, i) => (
+                <Field key={r.label} label={r.label} value={r.value} last={i === detailRows.length - 1} />
+              ))}
+            </section>
 
-            <div style={{ fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.05em", color: tokens.textHint, marginBottom: 9 }}>
-              Company materials {source && <span style={{ fontWeight: 500, textTransform: "none", letterSpacing: 0 }}>· via {source}</span>}
-            </div>
-            {loading ? (
-              <div style={{ display: "flex", flexDirection: "column", gap: 7 }}>
-                {Array.from({ length: 3 }).map((_, i) => (
-                  <div key={i} className="shimmer" style={{ height: 42, borderRadius: 12 }} />
-                ))}
+            {/* COMPANY MATERIALS — full-width module stacked below Event details */}
+            <section style={sectionModule}>
+              <div style={{ display: "flex", alignItems: "baseline", gap: 6, flexWrap: "wrap", marginBottom: 11 }}>
+                <span style={sectionTitle}>Company materials</span>
+                {source && <span style={{ fontSize: 11, fontWeight: 500, color: tokens.textHint }}>· via {source}</span>}
               </div>
-            ) : activeCats.length === 0 ? (
-              <div style={{ fontSize: 12.5, color: tokens.textHint }}>
-                No recent filings found on NSE, BSE or Screener for {event.company}.
-              </div>
-            ) : (
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
-                {activeCats.map((c) => {
-                  const m = filingCategoryMeta[c];
-                  const Icon = TAB_ICON[c];
-                  return (
-                    <button
-                      key={c}
-                      onClick={() => setTab(c)}
-                      className="card-hover"
-                      style={{
-                        display: "flex",
-                        alignItems: "center",
-                        gap: 9,
-                        padding: "10px 11px",
-                        borderRadius: 12,
-                        cursor: "pointer",
-                        textAlign: "left",
-                        border: `1px solid ${tokens.border}`,
-                        background: tokens.surface,
-                        boxShadow: tokens.shadowCard,
-                      }}
-                    >
-                      <span
+              {loading ? (
+                <div style={{ display: "flex", flexDirection: "column", gap: 7 }}>
+                  {Array.from({ length: 3 }).map((_, i) => (
+                    <div key={i} className="shimmer" style={{ height: 46, borderRadius: 12 }} />
+                  ))}
+                </div>
+              ) : activeCats.length === 0 ? (
+                <div style={{ fontSize: 12.5, color: tokens.textHint }}>
+                  No recent filings found on NSE, BSE or Screener for {event.company}.
+                </div>
+              ) : (
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
+                  {activeCats.map((c) => {
+                    const m = filingCategoryMeta[c];
+                    const Icon = TAB_ICON[c];
+                    return (
+                      <button
+                        key={c}
+                        onClick={() => setTab(c)}
+                        className="card-hover"
                         style={{
-                          width: 30,
-                          height: 30,
-                          borderRadius: 9,
-                          display: "inline-flex",
+                          display: "flex",
                           alignItems: "center",
-                          justifyContent: "center",
-                          color: m.hex,
-                          background: m.bg,
-                          border: `1px solid ${m.border}`,
-                          flexShrink: 0,
+                          gap: 10,
+                          padding: "11px 12px",
+                          borderRadius: 12,
+                          cursor: "pointer",
+                          textAlign: "left",
+                          border: `1px solid ${tokens.border}`,
+                          background: tokens.surface,
+                          boxShadow: tokens.shadowCard,
                         }}
                       >
-                        <Icon size={15} />
-                      </span>
-                      <div style={{ minWidth: 0 }}>
-                        <div style={{ fontSize: 17, fontWeight: 800, color: tokens.textPrimary, lineHeight: 1 }}>{byCat[c].length}</div>
-                        <div style={{ fontSize: 11, color: tokens.textMuted, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
-                          {TAB_LABEL[c]}
+                        <span
+                          style={{
+                            width: 32,
+                            height: 32,
+                            borderRadius: 9,
+                            display: "inline-flex",
+                            alignItems: "center",
+                            justifyContent: "center",
+                            color: m.hex,
+                            background: m.bg,
+                            border: `1px solid ${m.border}`,
+                            flexShrink: 0,
+                          }}
+                        >
+                          <Icon size={16} />
+                        </span>
+                        <div style={{ minWidth: 0 }}>
+                          <div style={{ fontSize: 18, fontWeight: 800, color: tokens.textPrimary, lineHeight: 1 }}>{byCat[c].length}</div>
+                          <div style={{ fontSize: 11, color: tokens.textMuted, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", marginTop: 2 }}>
+                            {TAB_LABEL[c]}
+                          </div>
                         </div>
-                      </div>
-                    </button>
-                  );
-                })}
-              </div>
-            )}
-
-            {others.length > 0 && (
-              <div style={{ marginTop: 20 }}>
-                <div style={{ fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.05em", color: tokens.textHint, marginBottom: 9 }}>
-                  Other upcoming events
+                      </button>
+                    );
+                  })}
                 </div>
+              )}
+            </section>
+
+            {/* Other upcoming events — same module framing (concept unchanged) */}
+            {others.length > 0 && (
+              <section style={sectionModule}>
+                <div style={{ ...sectionTitle, marginBottom: 9 }}>Other upcoming events</div>
                 <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
                   {others.map((o) => {
                     const om = eventTypeMeta[o.eventType];
@@ -588,9 +620,9 @@ export function EventDetail({
                     );
                   })}
                 </div>
-              </div>
+              </section>
             )}
-          </>
+          </div>
         ) : loading ? (
           <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
             {Array.from({ length: 4 }).map((_, i) => (
