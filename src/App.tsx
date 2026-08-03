@@ -274,7 +274,7 @@ export default function App() {
       </header>
 
       <main id="dashboard-main" data-dashboard-capture-root="true" className="dash-main">
-        <FiltersBar filters={filters} onChange={setFilters} counts={typeCounts} />
+        <FiltersBar filters={filters} onChange={setFilters} counts={typeCounts} isDark={isDark} />
 
         {result ? (
           <KpiRow events={baseFiltered} generatedAt={result.generatedAt} live={result.live} />

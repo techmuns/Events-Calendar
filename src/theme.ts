@@ -27,6 +27,7 @@ export const tokens = {
   textSecondary: "var(--text-secondary)",
   textMuted: "var(--text-muted)",
   textHint: "var(--text-hint)",
+  groupLabel: "var(--group-label)",
   errorRed: "var(--error-red)",
   errorBg: "var(--error-bg)",
   radiusCard: "var(--radius-card)",
