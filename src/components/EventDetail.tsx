@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import type { CSSProperties } from "react";
 import type { CompanyFiling, CorporateEvent, FilingCategory, FilingSource } from "../types";
-import { companyAccent, eventTypeMeta, filingCategoryMeta, initials, statusMeta, tokens } from "../theme";
+import { companyAccent, eventTypeMeta, filingCategoryMeta, initials, tokens } from "../theme";
 import {
   CalendarIcon,
   DownloadIcon,
@@ -280,7 +280,6 @@ export function EventDetail({
   const accentShadow = `0 1px 3px color-mix(in srgb, ${accent} 45%, transparent)`;
   const accentSoftBg = `color-mix(in srgb, ${accent} 12%, transparent)`;
   const typeMeta = eventTypeMeta[event.eventType];
-  const status = statusMeta[event.status];
   const starred = isStarred(event.ticker);
 
   const byCat: Record<FilingCategory, CompanyFiling[]> = { PRESS: [], MEET: [], PRESENTATION: [], CONCALL: [], SCHEME: [] };
@@ -377,18 +376,42 @@ export function EventDetail({
           </div>
         </div>
 
-        <div style={{ display: "flex", gap: 7, flexWrap: "wrap", marginTop: 12 }}>
-          <span style={{ ...headerChip, background: typeMeta.bg, color: typeMeta.text, border: `1px solid ${typeMeta.border}` }}>
-            <span style={{ width: 6, height: 6, borderRadius: "50%", background: typeMeta.hex }} />
-            {event.subtype}
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: 11,
+            marginTop: 13,
+            padding: "10px 12px",
+            borderRadius: 12,
+            background: tokens.surface,
+            border: `1px solid ${tokens.border}`,
+          }}
+        >
+          <span
+            style={{
+              flexShrink: 0,
+              width: 34,
+              height: 34,
+              borderRadius: 9,
+              display: "inline-flex",
+              alignItems: "center",
+              justifyContent: "center",
+              color: typeMeta.hex,
+              background: typeMeta.bg,
+              border: `1px solid ${typeMeta.border}`,
+            }}
+          >
+            <CalendarIcon size={17} />
           </span>
-          <span style={headerChip}>
-            <CalendarIcon size={12} /> {shortDate(event.date)}
-          </span>
-          <span style={{ ...headerChip, color: status.text, borderColor: status.border, background: status.bg }}>
-            <span style={{ width: 6, height: 6, borderRadius: "50%", background: status.hex }} />
-            {status.label}
-          </span>
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div style={{ fontSize: 10, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.05em", color: tokens.textHint }}>
+              Upcoming event
+            </div>
+            <div style={{ fontSize: 13.5, fontWeight: 700, color: tokens.textPrimary, marginTop: 1 }}>
+              {event.subtype} · {longDate(event.date)}
+            </div>
+          </div>
           <span style={headerChip}>{event.exchange}</span>
         </div>
 
@@ -452,7 +475,6 @@ export function EventDetail({
             <div style={{ marginBottom: 18 }}>
               <Field label="Date" value={longDate(event.date)} />
               {event.time && <Field label="Time" value={event.time} />}
-              <Field label="Status" value={status.label} />
               <Field label="Exchange" value={event.exchange} />
               {event.sector && <Field label="Sector" value={event.sector} />}
               {event.indices.length > 0 && <Field label="Index" value={event.indices.join(", ")} />}

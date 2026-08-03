@@ -2,8 +2,8 @@ import { useEffect, useState } from "react";
 import type { CSSProperties } from "react";
 import type { CorporateEvent } from "../types";
 import { tokens } from "../theme";
-import { Heatmap, computeDensity, dayLabel, type Day } from "./Heatmap";
-import { BarChartIcon, SparkIcon } from "./icons";
+import { Heatmap, computeDensity, dayLabel } from "./Heatmap";
+import { BarChartIcon } from "./icons";
 
 // Remember whether the density chart is expanded, across reloads.
 function usePersistedOpen(key: string, def: boolean): [boolean, (v: boolean) => void] {
@@ -25,25 +25,6 @@ function usePersistedOpen(key: string, def: boolean): [boolean, (v: boolean) => 
   return [open, setOpen];
 }
 
-function MiniBars({ days, max }: { days: Day[]; max: number }) {
-  return (
-    <span style={{ display: "inline-flex", alignItems: "flex-end", gap: 1.5, height: 20 }}>
-      {days.slice(0, 30).map((d, i) => {
-        const r = d.count / max;
-        const bg =
-          d.count === 0
-            ? `color-mix(in srgb, ${tokens.textHint} 22%, transparent)`
-            : r >= 0.66
-              ? "#7c3aed"
-              : r >= 0.33
-                ? "#4f46e5"
-                : "#a6aedc";
-        return <span key={i} style={{ width: 3, height: Math.max(2, r * 20), borderRadius: 1, background: bg }} />;
-      })}
-    </span>
-  );
-}
-
 // The "Earnings-season density" chart — a collapsible premium panel.
 export function DensityCard({
   events,
@@ -55,7 +36,7 @@ export function DensityCard({
   onSelectDay?: (dayISO: string | null) => void;
 }) {
   const [open, setOpen] = usePersistedOpen("ec_density_open", false);
-  const { days, max, busiest } = computeDensity(events);
+  const { busiest } = computeDensity(events);
   const peak = busiest[0];
 
   const card: CSSProperties = {
@@ -125,9 +106,8 @@ export function DensityCard({
           </div>
         </div>
         <span style={{ flex: 1 }} />
-        {!open && <MiniBars days={days} max={max} />}
         <button style={toggleBtn} onClick={() => setOpen(!open)}>
-          {open ? "Hide" : <><SparkIcon size={13} /> Show insights</>}
+          {open ? "Hide" : "Show insights"}
         </button>
       </div>
 

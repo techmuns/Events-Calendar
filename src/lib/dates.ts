@@ -46,12 +46,13 @@ export function formatMonthYear(d: Date): string {
   return `${MONTHS[d.getMonth()]} ${d.getFullYear()}`;
 }
 
-export type Bucket = "Today" | "This week" | "Next week" | "Later";
+export type Bucket = "Today" | "Tomorrow" | "This week" | "Next week" | "Later";
 
 export function bucketFor(eventISO: string, today: Date): Bucket {
   const d = parseISO(eventISO);
   const diff = diffDays(today, d);
   if (diff === 0) return "Today";
+  if (diff === 1) return "Tomorrow";
   const dow = today.getDay(); // 0 Sun .. 6 Sat
   const daysToSunday = (7 - dow) % 7;
   const thisWeekEnd = addDays(today, daysToSunday);

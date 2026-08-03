@@ -115,7 +115,7 @@ export function KpiRow({
   const next = events[0];
   const thisWeek = events.filter((e) => {
     const b = bucketFor(e.date, today);
-    return b === "Today" || b === "This week";
+    return b === "Today" || b === "Tomorrow" || b === "This week";
   }).length;
   const reporting = new Set(events.filter((e) => e.eventType === "EARNINGS").map((e) => e.ticker)).size;
 

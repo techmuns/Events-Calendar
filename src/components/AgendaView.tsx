@@ -8,7 +8,7 @@ import { ClockIcon, ExternalLinkIcon, StarIcon } from "./icons";
 import { type Bucket, bucketFor, formatDate, parseISO, todayStart } from "../lib/dates";
 
 const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
-const BUCKET_ORDER: Bucket[] = ["Today", "This week", "Next week", "Later"];
+const BUCKET_ORDER: Bucket[] = ["Today", "Tomorrow", "This week", "Next week", "Later"];
 
 interface RowHandlers {
   onSelect: (e: CorporateEvent) => void;
@@ -243,7 +243,7 @@ export function AgendaView({
     return <EmptyState message="No events match these filters" hint="Try widening the horizon or switching the universe to All." />;
   }
   const today = todayStart();
-  const groups: Record<Bucket, CorporateEvent[]> = { Today: [], "This week": [], "Next week": [], Later: [] };
+  const groups: Record<Bucket, CorporateEvent[]> = { Today: [], Tomorrow: [], "This week": [], "Next week": [], Later: [] };
   for (const e of events) groups[bucketFor(e.date, today)].push(e);
 
   return (

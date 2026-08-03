@@ -200,7 +200,10 @@ function parseBoardMeetings(data: unknown): CorporateEvent[] {
   const out: CorporateEvent[] = [];
   for (const r of data as Array<Record<string, string>>) {
     const desc = (r.bm_desc ?? "") + " " + (r.bm_purpose ?? "");
-    if (!/financial result/i.test(desc)) continue;
+    // Any results board meeting (Financial/Quarterly/Audited/…), but not the
+    // AGM/voting/buyback meetings that also contain the word "results".
+    if (!/result/i.test(desc)) continue;
+    if (/postal ballot|voting|scrutini|buy.?back/i.test(desc)) continue;
     const date = isoDate(r.bm_date);
     if (!date) continue;
     const ticker = (r.bm_symbol ?? "").trim();
@@ -210,7 +213,7 @@ function parseBoardMeetings(data: unknown): CorporateEvent[] {
       ticker,
       isin: r.sm_isin || undefined,
       eventType: "EARNINGS",
-      subtype: "Board Meeting — Results",
+      subtype: "Results",
       date,
       status: "CONFIRMED",
       exchange: "NSE",
@@ -250,10 +253,12 @@ function parseCorporateActions(data: unknown): CorporateEvent[] {
   return out;
 }
 
-// Dedupe across exchanges by company + type + date (keep first — BSE wins).
+// Dedupe across exchanges (keep first — BSE wins). A company reports earnings
+// once in the window, so earnings key on company alone (BSE and NSE can list
+// slightly different meeting dates); other actions keep the date.
 function normKey(e: CorporateEvent): string {
   const c = e.company.toLowerCase().replace(/ltd|limited/g, "").replace(/[^a-z0-9]/g, "");
-  return `${e.eventType}_${c}_${e.date}`;
+  return e.eventType === "EARNINGS" ? `EARNINGS_${c}` : `${e.eventType}_${c}_${e.date}`;
 }
 
 function dedupe(events: CorporateEvent[]): CorporateEvent[] {
@@ -588,13 +593,17 @@ async function buildLiveResult() {
   const now = new Date();
   const from = new Date(now);
   from.setDate(from.getDate() - 4);
+  // NSE board-meetings returns only a tiny default window without dates, so ask
+  // for the whole upcoming horizon — this is what surfaces NSE-only companies.
+  const bmTo = new Date(now);
+  bmTo.setDate(bmTo.getDate() + 120);
 
   const [constituents, settled, concalls] = await Promise.all([
     fetchConstituents().catch(() => new Map<string, Constituent>()),
     Promise.allSettled([
       bseJson("/Corpforthresults/w").then(parseBseForthResults),
       nseJson(
-        "/api/corporate-board-meetings?index=equities",
+        `/api/corporate-board-meetings?index=equities&from_date=${nseDate(now)}&to_date=${nseDate(bmTo)}`,
         `${NSE}/companies-listing/corporate-filings-board-meetings`,
         cookie,
       ).then(parseBoardMeetings),
