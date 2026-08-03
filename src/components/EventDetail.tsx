@@ -318,6 +318,8 @@ export function EventDetail({
   };
   // Compact white summary card for a Company Materials tile (elevated on the module).
   const materialCard: CSSProperties = {
+    position: "relative",
+    overflow: "hidden",
     display: "flex",
     alignItems: "center",
     gap: 10,
@@ -561,6 +563,7 @@ export function EventDetail({
                     const Icon = TAB_ICON[c];
                     return (
                       <button key={c} onClick={() => setTab(c)} className="card-hover" style={materialCard}>
+                        <span style={{ position: "absolute", top: 0, left: 0, right: 0, height: 3, background: m.hex }} />
                         <span
                           style={{
                             width: 32,
