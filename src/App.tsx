@@ -122,6 +122,24 @@ export default function App() {
     setSelected(e);
   };
 
+  // Reset to the clean landing view: close any open company profile, drop the
+  // day drill-down, and clear the search box (keeps universe/horizon prefs).
+  const goHome = () => {
+    setSelected(null);
+    setFocusDay(null);
+    setFilters((f) => (f.search ? { ...f, search: "" } : f));
+  };
+
+  const handleFilters = (next: Filters) => {
+    // Clearing the search returns home instead of leaving a searched company
+    // stranded open in the details panel.
+    if (!next.search && filters.search) {
+      setSelected(null);
+      setFocusDay(null);
+    }
+    setFilters(next);
+  };
+
   const baseFiltered = result ? applyFilters(result.events, filters, watchlist.set) : [];
   const filtered = focusDay ? baseFiltered.filter((e) => e.date === focusDay) : baseFiltered;
   const diffs = useEventDiff(result?.events ?? []);
@@ -196,27 +214,42 @@ export default function App() {
       >
         <div style={{ display: "flex", alignItems: "center", gap: 12, minWidth: 0 }}>
           <div
-            style={{
-              width: 36,
-              height: 36,
-              borderRadius: 11,
-              background: "rgba(255,255,255,0.16)",
-              border: "1px solid rgba(255,255,255,0.28)",
-              display: "inline-flex",
-              alignItems: "center",
-              justifyContent: "center",
-              color: "#fff",
-              flexShrink: 0,
+            onClick={goHome}
+            role="button"
+            tabIndex={0}
+            onKeyDown={(e) => {
+              if (e.key === "Enter" || e.key === " ") {
+                e.preventDefault();
+                goHome();
+              }
             }}
+            title="Back to home"
+            aria-label="Back to home"
+            style={{ display: "flex", alignItems: "center", gap: 12, minWidth: 0, cursor: "pointer" }}
           >
-            <CalendarIcon size={19} />
-          </div>
-          <div style={{ minWidth: 0 }}>
-            <h1 style={{ fontSize: 16, fontWeight: 700, color: "#fff", margin: 0, letterSpacing: "-0.01em", whiteSpace: "nowrap" }}>
-              Events Calendar
-            </h1>
-            <div className="hide-960" style={{ fontSize: 11, color: "rgba(255,255,255,0.72)", marginTop: 1, whiteSpace: "nowrap" }}>
-              Corporate events intelligence
+            <div
+              style={{
+                width: 36,
+                height: 36,
+                borderRadius: 11,
+                background: "rgba(255,255,255,0.16)",
+                border: "1px solid rgba(255,255,255,0.28)",
+                display: "inline-flex",
+                alignItems: "center",
+                justifyContent: "center",
+                color: "#fff",
+                flexShrink: 0,
+              }}
+            >
+              <CalendarIcon size={19} />
+            </div>
+            <div style={{ minWidth: 0 }}>
+              <h1 style={{ fontSize: 16, fontWeight: 700, color: "#fff", margin: 0, letterSpacing: "-0.01em", whiteSpace: "nowrap" }}>
+                Events Calendar
+              </h1>
+              <div className="hide-960" style={{ fontSize: 11, color: "rgba(255,255,255,0.72)", marginTop: 1, whiteSpace: "nowrap" }}>
+                Corporate events intelligence
+              </div>
             </div>
           </div>
           {ticker && (
@@ -274,7 +307,7 @@ export default function App() {
       </header>
 
       <main id="dashboard-main" data-dashboard-capture-root="true" className="dash-main">
-        <FiltersBar filters={filters} onChange={setFilters} counts={typeCounts} isDark={isDark} />
+        <FiltersBar filters={filters} onChange={handleFilters} counts={typeCounts} isDark={isDark} />
 
         {result ? (
           <KpiRow events={baseFiltered} generatedAt={result.generatedAt} live={result.live} />
