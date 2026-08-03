@@ -38,15 +38,20 @@
   --shadow-pop: 0 12px 30px rgba(15, 23, 42, 0.12), 0 4px 10px rgba(15, 23, 42, 0.06);
   --shadow-header: 0 8px 24px rgba(37, 60, 190, 0.28);
 
-  /* KPI card gradients — smooth directional pastel tints (no radial blobs) */
-  --kpi1-bg: linear-gradient(110deg, #f6f2ff 0%, #efe9ff 55%, #e7deff 100%);
-  --kpi1-bd: #dccff4;
-  --kpi2-bg: linear-gradient(110deg, #f2f6ff 0%, #eaf1ff 55%, #dee9ff 100%);
-  --kpi2-bd: #d2e0f8;
-  --kpi3-bg: linear-gradient(110deg, #ffffff 0%, #f3fcfd 55%, #e3f8fa 100%);
-  --kpi3-bd: #d0edf1;
-  --kpi4-bg: linear-gradient(110deg, #ffffff 0%, #f4fcf8 55%, #e3f7ed 100%);
-  --kpi4-bd: #d1eede;
+  /* KPI card gradients — richer pastel base (115deg) with a faint top-left white
+     sheen layered on top for soft surface depth. No background graphics. */
+  --kpi1-bg: linear-gradient(135deg, rgba(255, 255, 255, 0.42) 0%, rgba(255, 255, 255, 0.16) 38%, rgba(255, 255, 255, 0) 68%),
+    linear-gradient(115deg, #f7f1ff 0%, #f1e9ff 52%, #e8deff 100%);
+  --kpi1-bd: #d9cdf5;
+  --kpi2-bg: linear-gradient(135deg, rgba(255, 255, 255, 0.42) 0%, rgba(255, 255, 255, 0.16) 38%, rgba(255, 255, 255, 0) 68%),
+    linear-gradient(115deg, #f2f7ff 0%, #eaf1ff 52%, #dde9ff 100%);
+  --kpi2-bd: #cddcf8;
+  --kpi3-bg: linear-gradient(135deg, rgba(255, 255, 255, 0.42) 0%, rgba(255, 255, 255, 0.16) 38%, rgba(255, 255, 255, 0) 68%),
+    linear-gradient(115deg, #f1fcff 0%, #e4f8fc 52%, #d8f1f7 100%);
+  --kpi3-bd: #c8e9f0;
+  --kpi4-bg: linear-gradient(135deg, rgba(255, 255, 255, 0.42) 0%, rgba(255, 255, 255, 0.16) 38%, rgba(255, 255, 255, 0) 68%),
+    linear-gradient(115deg, #f2fcf6 0%, #e7f8ee 52%, #dcf2e5 100%);
+  --kpi4-bd: #c9ead8;
 
   /* Details-panel company header — same 110deg linear treatment as the KPIs */
   --detail-header-bg: linear-gradient(110deg, #eef4ff 0%, #f4f7ff 50%, #fcfdff 100%);
