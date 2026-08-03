@@ -321,6 +321,7 @@ export default function App() {
                   events={filtered}
                   diffs={diffs}
                   selectedId={selected?.id}
+                  isDark={isDark}
                   onSelect={selectEvent}
                   isStarred={watchlist.has}
                   onToggleStar={watchlist.toggle}

@@ -1,3 +1,4 @@
+import { useState } from "react";
 import type { CSSProperties } from "react";
 import type { CorporateEvent } from "../types";
 import type { EventDiff } from "../hooks/useEventDiff";
@@ -63,7 +64,7 @@ function Avatar({ name, seed }: { name: string; seed: string }) {
   );
 }
 
-function TypeChip({ type }: { type: CorporateEvent["eventType"] }) {
+function TypeChip({ type, active }: { type: CorporateEvent["eventType"]; active?: boolean }) {
   const m = eventTypeMeta[type];
   return (
     <span
@@ -72,13 +73,14 @@ function TypeChip({ type }: { type: CorporateEvent["eventType"] }) {
         alignItems: "center",
         gap: 5,
         fontSize: 10.5,
-        fontWeight: 600,
+        fontWeight: active ? 700 : 600,
         padding: "2px 8px",
         borderRadius: 7,
-        background: m.bg,
+        background: active ? `color-mix(in srgb, ${m.hex} 17%, transparent)` : m.bg,
         color: m.text,
-        border: `1px solid ${m.border}`,
+        border: `1px solid ${active ? `color-mix(in srgb, ${m.hex} 44%, transparent)` : m.border}`,
         whiteSpace: "nowrap",
+        transition: "background 160ms ease, border-color 160ms ease",
       }}
     >
       <span style={{ width: 6, height: 6, borderRadius: "50%", background: m.hex }} />
@@ -94,29 +96,51 @@ function EventRow({
   isStarred,
   onToggleStar,
   selected,
-}: { e: CorporateEvent; diff?: EventDiff; selected: boolean } & RowHandlers) {
+  isDark,
+}: { e: CorporateEvent; diff?: EventDiff; selected: boolean; isDark: boolean } & RowHandlers) {
+  const [hovered, setHovered] = useState(false);
   const starred = isStarred(e.ticker);
   const accent = companyAccent(e.ticker || e.company);
   const status = statusMeta[e.status];
+
+  // Three visual states, scoped to the light theme so dark mode is untouched:
+  //   default  → neutral, transparent
+  //   hover    → a soft preview of the selected accent card (lighter tint + lift)
+  //   selected → the existing, stronger persistent accent card
+  const hoverPreview = !isDark && hovered && !selected;
+  const warm = !isDark && (selected || hovered); // drives child micro-interactions
+
   const row: CSSProperties = {
     position: "relative",
+    zIndex: hoverPreview ? 1 : undefined,
     display: "flex",
     alignItems: "center",
     gap: 12,
     padding: "10px 14px 10px 18px",
-    borderBottom: `1px solid ${selected ? tokens.borderStrong : tokens.border}`,
+    borderBottom: `1px solid ${selected || hoverPreview ? tokens.borderStrong : tokens.border}`,
     cursor: "pointer",
     background: selected
       ? `linear-gradient(90deg, color-mix(in srgb, ${accent} 18%, transparent) 0%, color-mix(in srgb, ${accent} 7%, transparent) 100%)`
-      : "transparent",
+      : hoverPreview
+        ? `linear-gradient(90deg, color-mix(in srgb, ${accent} 11%, transparent) 0%, color-mix(in srgb, ${accent} 3%, transparent) 100%)`
+        : "transparent",
+    boxShadow: hoverPreview ? "0 2px 10px rgba(15, 23, 42, 0.07)" : "none",
+    transform: hoverPreview ? "translateY(-1px)" : "none",
+    transition: "background 160ms ease, box-shadow 160ms ease, transform 160ms ease, border-color 160ms ease",
   };
   const stop = (fn: () => void) => (ev: { stopPropagation: () => void }) => {
     ev.stopPropagation();
     fn();
   };
   return (
-    <div className="row-hover" style={row} onClick={() => onSelect(e)}>
-      {/* event-type accent stripe */}
+    <div
+      className="row-hover"
+      style={row}
+      onClick={() => onSelect(e)}
+      onMouseEnter={() => setHovered(true)}
+      onMouseLeave={() => setHovered(false)}
+    >
+      {/* company-accent left stripe — strengthens on hover, solid when selected */}
       <span
         style={{
           position: "absolute",
@@ -125,7 +149,8 @@ function EventRow({
           bottom: 0,
           width: 3,
           background: accent,
-          opacity: selected ? 1 : 0.55,
+          opacity: selected ? 1 : hoverPreview ? 0.9 : 0.55,
+          transition: "opacity 160ms ease",
         }}
       />
       <button
@@ -138,9 +163,10 @@ function EventRow({
           background: "transparent",
           padding: 6,
           borderRadius: 8,
-          color: starred ? "#f59e0b" : tokens.textHint,
+          color: starred ? "#f59e0b" : warm ? tokens.textMuted : tokens.textHint,
           display: "inline-flex",
           flexShrink: 0,
+          transition: "color 160ms ease",
         }}
       >
         <StarIcon size={17} filled={starred} />
@@ -162,11 +188,11 @@ function EventRow({
           >
             {e.company}
           </span>
-          <span style={{ fontSize: 11.5, fontWeight: 600, color: tokens.textHint }}>{e.ticker}</span>
+          <span style={{ fontSize: 11.5, fontWeight: 600, color: warm ? tokens.textSecondary : tokens.textHint }}>{e.ticker}</span>
           {diff?.isNew && <ChangeBadge kind="new" />}
           {diff?.isRevised && <ChangeBadge kind="moved" />}
         </div>
-        <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 3, fontSize: 12, color: tokens.textMuted }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 3, fontSize: 12, color: warm ? tokens.textSecondary : tokens.textMuted }}>
           <span style={{ whiteSpace: "nowrap" }}>{e.subtype}</span>
           {e.sector && (
             <>
@@ -188,7 +214,7 @@ function EventRow({
         </div>
       </div>
       <div style={{ display: "flex", alignItems: "center", gap: 8, flexShrink: 0 }}>
-        <TypeChip type={e.eventType} />
+        <TypeChip type={e.eventType} active={warm} />
         <span
           title={`${status.label} · ${e.exchange}`}
           style={{
@@ -197,12 +223,13 @@ function EventRow({
             gap: 5,
             fontSize: 10.5,
             fontWeight: 600,
-            color: tokens.textMuted,
+            color: warm ? tokens.textSecondary : tokens.textMuted,
             background: tokens.surface2,
-            border: `1px solid ${tokens.border}`,
+            border: `1px solid ${warm ? tokens.borderStrong : tokens.border}`,
             borderRadius: 7,
             padding: "2px 8px",
             whiteSpace: "nowrap",
+            transition: "color 160ms ease, border-color 160ms ease",
           }}
         >
           <span style={{ width: 6, height: 6, borderRadius: "50%", background: status.hex }} />
@@ -222,10 +249,11 @@ function EventRow({
               width: 30,
               height: 30,
               borderRadius: 8,
-              color: tokens.textMuted,
-              border: `1px solid ${tokens.border}`,
-              background: tokens.surface,
+              color: warm ? accent : tokens.textMuted,
+              border: `1px solid ${warm ? `color-mix(in srgb, ${accent} 40%, transparent)` : tokens.border}`,
+              background: warm ? `color-mix(in srgb, ${accent} 10%, ${tokens.surface})` : tokens.surface,
               flexShrink: 0,
+              transition: "color 160ms ease, border-color 160ms ease, background 160ms ease",
             }}
           >
             <ExternalLinkIcon size={14} />
@@ -240,8 +268,9 @@ export function AgendaView({
   events,
   diffs,
   selectedId,
+  isDark = false,
   ...handlers
-}: { events: CorporateEvent[]; diffs?: Map<string, EventDiff>; selectedId?: string | null } & RowHandlers) {
+}: { events: CorporateEvent[]; diffs?: Map<string, EventDiff>; selectedId?: string | null; isDark?: boolean } & RowHandlers) {
   if (events.length === 0) {
     return <EmptyState message="No events match these filters" hint="Try widening the horizon or switching the universe to All." />;
   }
@@ -273,7 +302,7 @@ export function AgendaView({
             <span style={{ color: tokens.textHint, fontWeight: 600 }}> · {groups[b].length}</span>
           </div>
           {groups[b].map((e) => (
-            <EventRow key={e.id} e={e} diff={diffs?.get(e.id)} selected={selectedId === e.id} {...handlers} />
+            <EventRow key={e.id} e={e} diff={diffs?.get(e.id)} selected={selectedId === e.id} isDark={isDark} {...handlers} />
           ))}
         </div>
       ))}
