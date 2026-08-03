@@ -89,10 +89,6 @@ const chipBtn: CSSProperties = {
   textDecoration: "none",
 };
 
-// Filing cards carry a subtle fixed purple accent (soft left border + primary CTA).
-const FILING_PURPLE = "#7c3aed";
-const FILING_PURPLE_GRAD = "linear-gradient(135deg, #7c3aed 0%, #6d28d9 100%)";
-
 function LinkAction({ label, url }: { label: string; url: string }) {
   const l = label.toLowerCase();
   const Icon = /ppt|present|deck|slide/.test(l)
@@ -110,14 +106,14 @@ function LinkAction({ label, url }: { label: string; url: string }) {
   );
 }
 
-function DocumentCard({ f }: { f: CompanyFiling }) {
+function DocumentCard({ f, accent }: { f: CompanyFiling; accent: string }) {
   const cat = filingCategoryMeta[f.category];
   return (
     <div
       className="card-hover"
       style={{
         border: `1px solid ${tokens.border}`,
-        borderLeft: `3px solid ${FILING_PURPLE}`,
+        borderLeft: `3px solid ${accent}`,
         borderRadius: 13,
         padding: 12,
         background: tokens.surface,
@@ -176,9 +172,9 @@ function DocumentCard({ f }: { f: CompanyFiling }) {
               ...chipBtn,
               flex: 1,
               color: "#fff",
-              background: FILING_PURPLE_GRAD,
+              background: `linear-gradient(135deg, ${accent} 0%, color-mix(in srgb, ${accent} 74%, #000) 100%)`,
               border: "none",
-              boxShadow: `0 1px 3px color-mix(in srgb, ${FILING_PURPLE} 45%, transparent)`,
+              boxShadow: `0 1px 3px color-mix(in srgb, ${accent} 45%, transparent)`,
             }}
           >
             <ExternalLinkIcon size={13} /> Open Filing
@@ -189,13 +185,13 @@ function DocumentCard({ f }: { f: CompanyFiling }) {
   );
 }
 
-function ConcallCard({ f }: { f: CompanyFiling }) {
+function ConcallCard({ f, accent }: { f: CompanyFiling; accent: string }) {
   return (
     <div
       className="card-hover"
       style={{
         border: `1px solid ${tokens.border}`,
-        borderLeft: `3px solid ${FILING_PURPLE}`,
+        borderLeft: `3px solid ${accent}`,
         borderRadius: 13,
         padding: 12,
         background: tokens.surface,
@@ -638,7 +634,7 @@ export function EventDetail({
         ) : (
           <div style={{ display: "flex", flexDirection: "column", gap: 9 }}>
             {byCat[tab].map((f, i) =>
-              f.links && f.links.length ? <ConcallCard key={i} f={f} /> : <DocumentCard key={i} f={f} />,
+              f.links && f.links.length ? <ConcallCard key={i} f={f} accent={accent} /> : <DocumentCard key={i} f={f} accent={accent} />,
             )}
             {(() => {
               const viewAllUrl = event.sourceUrl ?? byCat[tab].find((f) => f.url)?.url;
@@ -658,9 +654,9 @@ export function EventDetail({
                     fontSize: 12.5,
                     fontWeight: 600,
                     textDecoration: "none",
-                    color: FILING_PURPLE,
-                    background: `color-mix(in srgb, ${FILING_PURPLE} 8%, transparent)`,
-                    border: `1px solid color-mix(in srgb, ${FILING_PURPLE} 26%, transparent)`,
+                    color: accent,
+                    background: `color-mix(in srgb, ${accent} 8%, transparent)`,
+                    border: `1px solid color-mix(in srgb, ${accent} 26%, transparent)`,
                   }}
                 >
                   View all {TAB_LABEL[tab].toLowerCase()} <ExternalLinkIcon size={13} />
