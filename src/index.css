@@ -14,6 +14,8 @@
   --text-muted: #64748b;
   --text-hint: #94a3b8;
   --group-label: #64748b;
+  --module-bg: #f7f9fc;
+  --module-bd: #e4e9f2;
 
   /* Brand */
   --primary: #4f46e5;
@@ -85,6 +87,8 @@
   --text-muted: #8190aa;
   --text-hint: #6b7a95;
   --group-label: #afc0d8;
+  --module-bg: #101c30;
+  --module-bd: #22314c;
   --primary: #818cf8;
   --primary-light: rgba(99, 102, 241, 0.18);
   --primary-border: rgba(129, 140, 248, 0.36);
@@ -142,6 +146,8 @@
     --text-muted: #8190aa;
     --text-hint: #6b7a95;
     --group-label: #afc0d8;
+    --module-bg: #101c30;
+    --module-bd: #22314c;
     --primary: #818cf8;
     --primary-light: rgba(99, 102, 241, 0.18);
     --primary-border: rgba(129, 140, 248, 0.36);

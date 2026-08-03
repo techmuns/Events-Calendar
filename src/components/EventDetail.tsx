@@ -259,13 +259,14 @@ function Field({ label, value, last }: { label: string; value: string; last?: bo
       style={{
         display: "flex",
         justifyContent: "space-between",
+        alignItems: "center",
         gap: 12,
-        padding: "9px 0",
+        padding: "8px 0",
         borderBottom: last ? "none" : `1px solid ${tokens.border}`,
       }}
     >
-      <span style={{ fontSize: 12.5, color: tokens.textHint }}>{label}</span>
-      <span style={{ fontSize: 13, fontWeight: 600, color: tokens.textSecondary, textAlign: "right" }}>{value}</span>
+      <span style={{ fontSize: 12.5, color: tokens.textMuted }}>{label}</span>
+      <span style={{ fontSize: 13.5, fontWeight: 700, color: tokens.textPrimary, textAlign: "right" }}>{value}</span>
     </div>
   );
 }
@@ -313,15 +314,13 @@ export function EventDetail({
     ...(event.indices.length > 0 ? [{ label: "Index", value: event.indices.join(", ") }] : []),
   ];
 
-  // Event Details sits in a single soft WHITE card — no bulky grey container.
-  const detailsCard: CSSProperties = {
-    background: tokens.surface,
-    border: `1px solid ${tokens.border}`,
-    borderRadius: 14,
-    boxShadow: tokens.shadowCard,
-    padding: "4px 14px 5px",
+  // Soft, cool-tinted Overview module surface (polished, not a heavy grey block).
+  const overviewModule: CSSProperties = {
+    background: tokens.moduleBg,
+    border: `1px solid ${tokens.moduleBd}`,
+    borderRadius: 16,
   };
-  // Compact white summary card for a Company Materials tile.
+  // Compact white summary card for a Company Materials tile (elevated on the module).
   const materialCard: CSSProperties = {
     display: "flex",
     alignItems: "center",
@@ -532,20 +531,19 @@ export function EventDetail({
       {/* Content */}
       <div style={{ flex: 1, minHeight: 0, overflow: "auto", padding: 16, background: tokens.cardBodyBg }}>
         {tab === "overview" ? (
-          <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
-            {/* EVENT DETAILS — full width, first, in one soft white card */}
-            <div>
-              <div style={{ ...sectionTitle, marginBottom: 8 }}>Event details</div>
-              <div style={detailsCard}>
-                {detailRows.map((r, i) => (
-                  <Field key={r.label} label={r.label} value={r.value} last={i === detailRows.length - 1} />
-                ))}
-              </div>
+          <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+            {/* EVENT DETAILS — full-width polished module with a subtle company-accent top line */}
+            <div style={{ ...overviewModule, position: "relative", overflow: "hidden", padding: "13px 15px 9px" }}>
+              <span style={{ position: "absolute", top: 0, left: 0, right: 0, height: 3, background: accentGrad }} />
+              <div style={{ ...sectionTitle, marginBottom: 6 }}>Event details</div>
+              {detailRows.map((r, i) => (
+                <Field key={r.label} label={r.label} value={r.value} last={i === detailRows.length - 1} />
+              ))}
             </div>
 
-            {/* COMPANY MATERIALS — full width below; compact white summary cards, no grey box */}
-            <div>
-              <div style={{ display: "flex", alignItems: "baseline", gap: 6, flexWrap: "wrap", marginBottom: 10 }}>
+            {/* COMPANY MATERIALS — full-width polished module below; compact white summary cards */}
+            <div style={{ ...overviewModule, padding: "13px 15px 15px" }}>
+              <div style={{ display: "flex", alignItems: "baseline", gap: 6, flexWrap: "wrap", marginBottom: 12 }}>
                 <span style={sectionTitle}>Company materials</span>
                 {source && <span style={{ fontSize: 11, fontWeight: 500, color: tokens.textHint }}>· via {source}</span>}
               </div>
@@ -595,10 +593,10 @@ export function EventDetail({
               )}
             </div>
 
-            {/* Other upcoming events — same compact white-card language */}
+            {/* Other upcoming events — same polished module framing */}
             {others.length > 0 && (
-              <div>
-                <div style={{ ...sectionTitle, marginBottom: 9 }}>Other upcoming events</div>
+              <div style={{ ...overviewModule, padding: "13px 15px 14px" }}>
+                <div style={{ ...sectionTitle, marginBottom: 10 }}>Other upcoming events</div>
                 <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
                   {others.map((o) => {
                     const om = eventTypeMeta[o.eventType];

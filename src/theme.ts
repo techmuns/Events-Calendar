@@ -28,6 +28,8 @@ export const tokens = {
   textMuted: "var(--text-muted)",
   textHint: "var(--text-hint)",
   groupLabel: "var(--group-label)",
+  moduleBg: "var(--module-bg)",
+  moduleBd: "var(--module-bd)",
   errorRed: "var(--error-red)",
   errorBg: "var(--error-bg)",
   radiusCard: "var(--radius-card)",
@@ -73,7 +75,7 @@ export const eventTypeMeta: Record<EventType, Chip> = {
 
 // Filing categories in the details panel.
 export const filingCategoryMeta: Record<FilingCategory, Chip> = {
-  PRESS: chip("Press Release", "#64748b"),
+  PRESS: chip("Press Release", "#6d4bff"),
   MEET: chip("Investor Meet", "#7c3aed"),
   PRESENTATION: chip("Presentation", "#06b6d4"),
   CONCALL: chip("Concall", "#14b8a6"),
