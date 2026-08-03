@@ -27,15 +27,22 @@ export function dayLabel(d: Date): string {
 
 // Daily buckets over an adaptive window (today → last event, clamped), plus the
 // peak and the busiest days. Shared by the full chart and its collapsed summary.
-export function computeDensity(events: CorporateEvent[]): { days: Day[]; max: number; busiest: Day[] } {
+export function computeDensity(events: CorporateEvent[], windowDays?: number): { days: Day[]; max: number; busiest: Day[] } {
   const today = todayStart();
 
-  let lastOffset = 0;
-  for (const e of events) {
-    const d = diffDays(today, parseISO(e.date));
-    if (d >= 0 && d > lastOffset) lastOffset = d;
+  let span: number;
+  if (windowDays != null) {
+    // Match the active horizon exactly: today (offset 0) through today+windowDays,
+    // so a 7-day horizon ends on day 7 rather than trailing empty days.
+    span = Math.max(2, Math.min(windowDays + 1, 366));
+  } else {
+    let lastOffset = 0;
+    for (const e of events) {
+      const d = diffDays(today, parseISO(e.date));
+      if (d >= 0 && d > lastOffset) lastOffset = d;
+    }
+    span = Math.min(MAX_DAYS, Math.max(MIN_DAYS, lastOffset + 2));
   }
-  const span = Math.min(MAX_DAYS, Math.max(MIN_DAYS, lastOffset + 2));
 
   const days: Day[] = Array.from({ length: span }, (_, i) => {
     const date = addDays(today, i);
@@ -75,12 +82,14 @@ export function Heatmap({
   events,
   selectedDay,
   onSelectDay,
+  horizonDays,
 }: {
   events: CorporateEvent[];
   selectedDay?: string | null;
   onSelectDay?: (dayISO: string | null) => void;
+  horizonDays?: number;
 }) {
-  const { days, max } = computeDensity(events);
+  const { days, max } = computeDensity(events, horizonDays);
   const labelThreshold = Math.max(10, max * 0.45);
   const [hover, setHover] = useState<{ day: Day; x: number; y: number } | null>(null);
 
@@ -109,6 +118,8 @@ export function Heatmap({
             gap: 5,
             overflowX: "auto",
             alignItems: "flex-end",
+            // Few bars (short horizon) centre nicely; longer windows fill and scroll.
+            justifyContent: days.length <= 16 ? "center" : "flex-start",
             paddingBottom: 2,
           }}
         >

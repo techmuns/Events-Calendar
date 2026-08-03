@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import type { CSSProperties } from "react";
 import type { EventType, Filters, Universe } from "../types";
 import { eventTypeMeta, tokens } from "../theme";
@@ -109,6 +109,59 @@ function Segmented<T extends string | number>({
 
 function Divider() {
   return <div style={{ width: 1, alignSelf: "stretch", background: tokens.border, margin: "0 2px" }} />;
+}
+
+// Free-form horizon: type any number of days when the 7/30/90 presets don't fit.
+function CustomHorizon({ value, onChange }: { value: number; onChange: (v: number) => void }) {
+  const isCustom = !HORIZONS.includes(value);
+  const [text, setText] = useState(isCustom ? String(value) : "");
+  useEffect(() => {
+    setText(isCustom ? String(value) : "");
+  }, [value, isCustom]);
+
+  return (
+    <div
+      title="Custom horizon (days)"
+      style={{
+        display: "inline-flex",
+        alignItems: "center",
+        gap: 3,
+        borderRadius: 10,
+        padding: "4px 10px",
+        border: `1px solid ${isCustom ? tokens.primary : tokens.border}`,
+        background: isCustom ? tokens.primaryLight : tokens.surface2,
+        boxShadow: isCustom ? `0 0 0 3px color-mix(in srgb, ${tokens.primary} 14%, transparent)` : "none",
+        transition: "all 0.2s",
+      }}
+    >
+      <input
+        type="text"
+        inputMode="numeric"
+        value={text}
+        onChange={(e) => {
+          const digits = e.target.value.replace(/[^0-9]/g, "").slice(0, 3);
+          setText(digits);
+          const n = parseInt(digits, 10);
+          if (!Number.isNaN(n) && n > 0) onChange(Math.min(365, n));
+        }}
+        onBlur={() => setText(isCustom ? String(value) : "")}
+        placeholder="Custom"
+        aria-label="Custom horizon in days"
+        style={{
+          width: 60,
+          border: "none",
+          outline: "none",
+          background: "transparent",
+          fontFamily: tokens.font,
+          fontSize: 14,
+          fontWeight: isCustom ? 700 : 600,
+          color: isCustom ? tokens.primaryText : tokens.textSecondary,
+          padding: 0,
+        }}
+      />
+      {isCustom && <span style={{ fontSize: 12.5, fontWeight: 600, color: tokens.textMuted }}>d</span>}
+    </div>
+  );
 }
 
 export function FiltersBar({
@@ -238,11 +291,14 @@ export function FiltersBar({
 
       <div>
         <div style={groupLabel}>Horizon</div>
-        <Segmented
-          options={HORIZONS.map((h) => ({ key: h, label: `${h}d` }))}
-          value={filters.horizonDays}
-          onChange={(v) => onChange({ ...filters, horizonDays: v })}
-        />
+        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+          <Segmented
+            options={HORIZONS.map((h) => ({ key: h, label: `${h}d` }))}
+            value={filters.horizonDays}
+            onChange={(v) => onChange({ ...filters, horizonDays: v })}
+          />
+          <CustomHorizon value={filters.horizonDays} onChange={(v) => onChange({ ...filters, horizonDays: v })} />
+        </div>
       </div>
 
       <div style={{ flex: 1, minWidth: 200 }}>

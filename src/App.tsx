@@ -14,7 +14,7 @@ import { DetailTable } from "./components/DetailTable";
 import { WidgetCard } from "./components/WidgetCard";
 import { ErrorState, ShimmerRows } from "./components/states";
 import { DensityCard } from "./components/DensityCard";
-import { DetailPanel } from "./components/DetailPanel";
+import { EventModal } from "./components/EventModal";
 import { useTheme } from "./hooks/useTheme";
 import { useWatchlist } from "./hooks/useWatchlist";
 import { useEventDiff } from "./hooks/useEventDiff";
@@ -315,8 +315,13 @@ export default function App() {
           <KpiShimmer />
         )}
 
-        {result && baseFiltered.length > 0 && (
-          <DensityCard events={baseFiltered} selectedDay={focusDay} onSelectDay={setFocusDay} />
+        {result && baseFiltered.length > 0 && !filters.search.trim() && (
+          <DensityCard
+            events={baseFiltered}
+            selectedDay={focusDay}
+            onSelectDay={setFocusDay}
+            horizonDays={filters.horizonDays}
+          />
         )}
 
         <div className="workspace">
@@ -366,19 +371,19 @@ export default function App() {
               )}
             </WidgetCard>
           </div>
-
-          <div className="pane pane-right">
-            <DetailPanel
-              selected={selected}
-              allEvents={result?.events ?? []}
-              onSelect={selectEvent}
-              isStarred={watchlist.has}
-              onToggleStar={watchlist.toggle}
-              source={result?.source ?? "BSE + NSE"}
-            />
-          </div>
         </div>
       </main>
+
+      {selected && (
+        <EventModal
+          event={selected}
+          allEvents={result?.events ?? []}
+          onSelect={selectEvent}
+          isStarred={watchlist.has}
+          onToggleStar={watchlist.toggle}
+          onClose={() => setSelected(null)}
+        />
+      )}
     </div>
   );
 }

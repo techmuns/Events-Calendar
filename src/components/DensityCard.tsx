@@ -30,13 +30,15 @@ export function DensityCard({
   events,
   selectedDay,
   onSelectDay,
+  horizonDays,
 }: {
   events: CorporateEvent[];
   selectedDay?: string | null;
   onSelectDay?: (dayISO: string | null) => void;
+  horizonDays?: number;
 }) {
   const [open, setOpen] = usePersistedOpen("ec_density_open", false);
-  const { busiest } = computeDensity(events);
+  const { busiest } = computeDensity(events, horizonDays);
   const peak = busiest[0];
 
   const card: CSSProperties = {
@@ -129,7 +131,7 @@ export function DensityCard({
               padding: "16px 14px 12px",
             }}
           >
-            <Heatmap events={events} selectedDay={selectedDay} onSelectDay={onSelectDay} />
+            <Heatmap events={events} selectedDay={selectedDay} onSelectDay={onSelectDay} horizonDays={horizonDays} />
           </div>
         </div>
       )}
