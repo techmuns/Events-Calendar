@@ -35,7 +35,7 @@ const TAB_LABEL: Record<FilingCategory, string> = {
   PRESS: "Press Releases",
   MEET: "Investor Meets",
   PRESENTATION: "Presentations",
-  CONCALL: "Concalls",
+  CONCALL: "Earnings Calls",
   SCHEME: "Corporate Actions",
 };
 const TAB_ICON: Record<FilingCategory, (p: { size?: number }) => JSX.Element> = {
@@ -287,6 +287,7 @@ export function EventDetail({
   const { filings, source, loading } = useCompanyFilings(event.ticker, event.company);
   const [tab, setTab] = useState<"overview" | FilingCategory>("overview");
   useEffect(() => setTab("overview"), [event.id]);
+  const isProfile = event.isProfile === true; // searched company with no upcoming event
 
   // Company identity accent, derived from the initials/avatar colour and applied
   // consistently across the details panel (avatar, active tab, count pills, CTA).
@@ -470,10 +471,10 @@ export function EventDetail({
           </span>
           <div style={{ flex: 1, minWidth: 0 }}>
             <div style={{ fontSize: 10, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.05em", color: tokens.textHint }}>
-              Upcoming event
+              {isProfile ? "Company profile" : "Upcoming event"}
             </div>
             <div style={{ fontSize: 13.5, fontWeight: 700, color: tokens.textPrimary, marginTop: 1 }}>
-              {event.subtype} · {longDate(event.date)}
+              {isProfile ? "Past filings, calls & investor materials" : `${event.subtype} · ${longDate(event.date)}`}
             </div>
           </div>
           <span style={headerChip}>{event.exchange}</span>
@@ -528,14 +529,16 @@ export function EventDetail({
       <div style={{ flex: 1, minHeight: 0, overflow: "auto", padding: 16, background: tokens.cardBodyBg }}>
         {tab === "overview" ? (
           <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
-            {/* EVENT DETAILS — full-width polished module with a subtle company-accent top line */}
-            <div style={{ ...overviewModule, position: "relative", overflow: "hidden", padding: "13px 15px 9px" }}>
-              <span style={{ position: "absolute", top: 0, left: 0, right: 0, height: 3, background: accentGrad }} />
-              <div style={{ ...sectionTitle, marginBottom: 6 }}>Event details</div>
-              {detailRows.map((r, i) => (
-                <Field key={r.label} label={r.label} value={r.value} last={i === detailRows.length - 1} />
-              ))}
-            </div>
+            {/* EVENT DETAILS — hidden for a searched company profile (no real event) */}
+            {!isProfile && (
+              <div style={{ ...overviewModule, position: "relative", overflow: "hidden", padding: "13px 15px 9px" }}>
+                <span style={{ position: "absolute", top: 0, left: 0, right: 0, height: 3, background: accentGrad }} />
+                <div style={{ ...sectionTitle, marginBottom: 6 }}>Event details</div>
+                {detailRows.map((r, i) => (
+                  <Field key={r.label} label={r.label} value={r.value} last={i === detailRows.length - 1} />
+                ))}
+              </div>
+            )}
 
             {/* COMPANY MATERIALS — full-width polished module below; compact white summary cards */}
             <div style={{ ...overviewModule, padding: "13px 15px 15px" }}>

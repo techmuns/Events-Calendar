@@ -2,7 +2,7 @@
 // EventsProvider, so moving from sample data to the live NSE/BSE feed is a
 // one-line swap of `eventsProvider` below — no component changes.
 
-import type { CompanyFilingsResult, EventsResult } from "../types";
+import type { CompanyFilingsResult, CompanyMatch, EventsResult } from "../types";
 import { buildSampleConcalls, buildSampleEvents } from "./sampleEvents";
 
 export interface EventsProvider {
@@ -68,4 +68,26 @@ export async function getCompanyFilings(symbol: string, name = ""): Promise<Comp
   const normalised: CompanyFilingsResult = { ...data, filings: data.filings ?? [] };
   filingsCache.set(key, normalised);
   return normalised;
+}
+
+// Free-text company lookup so a searched firm with no upcoming event can still
+// be opened for its past filings & calls.
+const searchCache = new Map<string, CompanyMatch[]>();
+
+export async function getCompanySearch(query: string): Promise<CompanyMatch[]> {
+  const q = query.trim();
+  if (q.length < 2) return [];
+  const key = q.toLowerCase();
+  const cached = searchCache.get(key);
+  if (cached) return cached;
+  try {
+    const res = await fetch(`/api/company-search?q=${encodeURIComponent(q)}`);
+    if (!res.ok) return [];
+    const data = (await res.json()) as { results?: CompanyMatch[] };
+    const results = data.results ?? [];
+    searchCache.set(key, results);
+    return results;
+  } catch {
+    return [];
+  }
 }

@@ -1,9 +1,10 @@
 import { useMemo, useState } from "react";
 import type { CSSProperties, ReactNode } from "react";
-import type { CorporateEvent, EventType, Filters } from "./types";
-import { tokens } from "./theme";
+import type { CompanyMatch, CorporateEvent, EventType, Filters } from "./types";
+import { companyAccent, tokens } from "./theme";
 import { useEvents } from "./hooks/useEvents";
 import { useHostContext } from "./hooks/useHostContext";
+import { useCompanySearch } from "./hooks/useCompanySearch";
 import { applyFilters } from "./lib/filter";
 import { formatDate } from "./lib/dates";
 import { FiltersBar } from "./components/FiltersBar";
@@ -12,13 +13,13 @@ import { AgendaView } from "./components/AgendaView";
 import { MonthView } from "./components/MonthView";
 import { DetailTable } from "./components/DetailTable";
 import { WidgetCard } from "./components/WidgetCard";
-import { ErrorState, ShimmerRows } from "./components/states";
+import { EmptyState, ErrorState, ShimmerRows } from "./components/states";
 import { DensityCard } from "./components/DensityCard";
 import { EventModal } from "./components/EventModal";
 import { useTheme } from "./hooks/useTheme";
 import { useWatchlist } from "./hooks/useWatchlist";
 import { useEventDiff } from "./hooks/useEventDiff";
-import { HomeIcon, MoonIcon, RefreshIcon, SunIcon } from "./components/icons";
+import { ChevronRightIcon, HomeIcon, MoonIcon, RefreshIcon, SunIcon } from "./components/icons";
 
 const DEFAULT_FILTERS: Filters = {
   universe: "ALL",
@@ -108,6 +109,83 @@ function HeaderChip({ children, className }: { children: ReactNode; className?: 
   );
 }
 
+// Search results for listed companies that have no upcoming event — clicking one
+// opens its read-only profile (past filings & calls).
+function CompanyProfileResults({
+  matches,
+  loading,
+  onOpen,
+}: {
+  matches: CompanyMatch[];
+  loading: boolean;
+  onOpen: (m: CompanyMatch) => void;
+}) {
+  if (!loading && matches.length === 0) return null;
+  return (
+    <div style={{ padding: "11px 14px", borderBottom: `1px solid ${tokens.border}`, background: tokens.cardBodyBg }}>
+      <div
+        style={{
+          fontSize: 10.5,
+          fontWeight: 700,
+          textTransform: "uppercase",
+          letterSpacing: "0.05em",
+          color: tokens.textHint,
+          marginBottom: 8,
+        }}
+      >
+        Companies {loading ? "· searching…" : `· ${matches.length}`}
+      </div>
+      <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+        {matches.map((m) => {
+          const accent = companyAccent(m.symbol || m.name);
+          return (
+            <button
+              key={m.symbol}
+              onClick={() => onOpen(m)}
+              className="card-hover"
+              style={{
+                cursor: "pointer",
+                textAlign: "left",
+                display: "flex",
+                alignItems: "center",
+                gap: 11,
+                padding: "9px 12px",
+                borderRadius: 11,
+                border: `1px solid ${tokens.border}`,
+                borderLeft: `3px solid ${accent}`,
+                background: tokens.surface,
+                boxShadow: tokens.shadowCard,
+              }}
+            >
+              <span style={{ width: 9, height: 9, borderRadius: "50%", background: accent, flexShrink: 0 }} />
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div
+                  style={{
+                    fontSize: 13.5,
+                    fontWeight: 700,
+                    color: tokens.textPrimary,
+                    whiteSpace: "nowrap",
+                    overflow: "hidden",
+                    textOverflow: "ellipsis",
+                  }}
+                >
+                  {m.name}
+                </div>
+                <div style={{ fontSize: 11.5, color: tokens.textMuted, marginTop: 1 }}>
+                  {m.symbol} · {m.exchange} · past filings &amp; calls
+                </div>
+              </div>
+              <span style={{ display: "inline-flex", alignItems: "center", gap: 3, fontSize: 12, fontWeight: 600, color: accent, flexShrink: 0 }}>
+                View <ChevronRightIcon size={14} />
+              </span>
+            </button>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
 export default function App() {
   const [filters, setFilters] = useState<Filters>(DEFAULT_FILTERS);
   const [view, setView] = useState<View>("agenda");
@@ -120,6 +198,24 @@ export default function App() {
 
   const selectEvent = (e: CorporateEvent) => {
     setSelected(e);
+  };
+
+  // Open a searched company that has no upcoming event as a read-only profile
+  // (its past filings, calls and materials still load in the details modal).
+  const openProfile = (m: CompanyMatch) => {
+    setSelected({
+      id: `profile_${m.symbol}`,
+      company: m.name,
+      ticker: m.symbol,
+      eventType: "EARNINGS",
+      subtype: "Company profile",
+      date: new Date().toISOString().slice(0, 10),
+      status: "TENTATIVE",
+      exchange: m.exchange,
+      indices: [],
+      sector: "",
+      isProfile: true,
+    });
   };
 
   // Reset to the clean landing view: close any open company profile, drop the
@@ -142,6 +238,16 @@ export default function App() {
 
   const baseFiltered = result ? applyFilters(result.events, filters, watchlist.set) : [];
   const filtered = focusDay ? baseFiltered.filter((e) => e.date === focusDay) : baseFiltered;
+
+  // Company search: surface listed firms that have no upcoming event (so they're
+  // absent from the list) — e.g. CDSL, or a company that already reported.
+  const { results: companyMatches, loading: searchLoading } = useCompanySearch(filters.search);
+  const isSearching = filters.search.trim().length >= 2;
+  const searchProfiles = useMemo(() => {
+    const inList = new Set(filtered.map((e) => e.ticker.toUpperCase()));
+    return companyMatches.filter((m) => !inList.has(m.symbol.toUpperCase()));
+  }, [companyMatches, filtered]);
+
   const diffs = useEventDiff(result?.events ?? []);
   let newCount = 0;
   let revCount = 0;
@@ -354,20 +460,34 @@ export default function App() {
                 <ErrorState message={error} />
               ) : !result ? (
                 <ShimmerRows rows={6} />
-              ) : view === "agenda" ? (
-                <AgendaView
-                  events={filtered}
-                  diffs={diffs}
-                  selectedId={selected?.id}
-                  isDark={isDark}
-                  onSelect={selectEvent}
-                  isStarred={watchlist.has}
-                  onToggleStar={watchlist.toggle}
-                />
-              ) : view === "month" ? (
-                <MonthView events={filtered} onSelect={selectEvent} />
               ) : (
-                <DetailTable events={filtered} onSelect={selectEvent} />
+                <>
+                  {isSearching && <CompanyProfileResults matches={searchProfiles} loading={searchLoading} onOpen={openProfile} />}
+                  {view === "agenda" ? (
+                    filtered.length === 0 && isSearching ? (
+                      searchProfiles.length > 0 ? null : (
+                        <EmptyState
+                          message={searchLoading ? "Searching companies…" : `No results for “${filters.search.trim()}”`}
+                          hint="Try the full company name or its ticker symbol."
+                        />
+                      )
+                    ) : (
+                      <AgendaView
+                        events={filtered}
+                        diffs={diffs}
+                        selectedId={selected?.id}
+                        isDark={isDark}
+                        onSelect={selectEvent}
+                        isStarred={watchlist.has}
+                        onToggleStar={watchlist.toggle}
+                      />
+                    )
+                  ) : view === "month" ? (
+                    <MonthView events={filtered} onSelect={selectEvent} />
+                  ) : (
+                    <DetailTable events={filtered} onSelect={selectEvent} />
+                  )}
+                </>
               )}
             </WidgetCard>
           </div>

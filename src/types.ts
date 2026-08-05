@@ -25,6 +25,15 @@ export interface CorporateEvent {
   indices: string[]; // e.g. ["NIFTY50", "NIFTY500"]
   sector: string;
   marketCap?: MarketCap;
+  isProfile?: boolean; // a searched company with no upcoming event — show its past filings only
+}
+
+// A company match from search (used to open a profile for firms that have no
+// upcoming event, e.g. CDSL / Tata Steel / an already-reported company).
+export interface CompanyMatch {
+  name: string;
+  symbol: string;
+  exchange: Exchange;
 }
 
 // Concalls have no structured future date on BSE/NSE (it lives inside the PDF

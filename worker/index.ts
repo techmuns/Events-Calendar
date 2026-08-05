@@ -401,6 +401,23 @@ function filingTitle(text: string, desc: string): string {
   return label.slice(0, 90);
 }
 
+// Turn terse/jargon exchange wording into a plain-English heading a
+// non-finance user can read (esp. the "Investor Meets" bucket).
+function friendlyTitle(cat: FilingCategory, raw: string): string {
+  const t = (raw ?? "").toLowerCase();
+  if (cat === "MEET") {
+    if (/transcript/.test(t)) return "Earnings Call — Transcript";
+    if (/recording|audio|\brec\b/.test(t)) return "Earnings Call — Audio Recording";
+    if (/presentation|\bppt\b/.test(t)) return "Investor Presentation";
+    if (/schedule|intimation|notice/.test(t)) return "Analyst / Investor Meeting";
+    if (/outcome|proceeding|summary|update/.test(t)) return "Investor Meeting — Update";
+    if (/investor|analyst|institutional|con\.? ?call/.test(t)) return "Analyst / Investor Meeting";
+    if (raw.trim().length < 10) return "Analyst / Investor Meeting";
+  }
+  if (cat === "PRESENTATION") return raw.trim().length < 10 ? "Investor Presentation" : raw;
+  return raw;
+}
+
 function parseCompanyFilings(data: unknown): CompanyFiling[] {
   if (!Array.isArray(data)) return [];
   const out: CompanyFiling[] = [];
@@ -413,7 +430,7 @@ function parseCompanyFilings(data: unknown): CompanyFiling[] {
     const date = anyDate(r.an_dt) ?? anyDate(r.sort_date ?? "");
     if (!date) continue;
     seen.add(url);
-    out.push({ category: cat, title: filingTitle(r.attchmntText ?? "", r.desc ?? ""), date, url, source: hostSource(url) });
+    out.push({ category: cat, title: friendlyTitle(cat, filingTitle(r.attchmntText ?? "", r.desc ?? "")), date, url, source: hostSource(url) });
   }
   out.sort((a, b) => b.date.localeCompare(a.date));
   return out.slice(0, 40);
@@ -502,6 +519,32 @@ async function resolveScreener(query: string): Promise<{ sym: string; html: stri
   }
 }
 
+// Free-text company search (any NSE/BSE-listed name), so a user can pull up a
+// company that has no upcoming board meeting (CDSL, an already-reported firm)
+// and still read its past filings & calls. Backed by Screener's search.
+async function searchCompanies(q: string): Promise<Array<{ name: string; symbol: string; exchange: string }>> {
+  const query = (q ?? "").trim();
+  if (query.length < 2) return [];
+  try {
+    const raw = await screenerFetch(`/api/company/search/?q=${encodeURIComponent(query)}`);
+    const arr = JSON.parse(raw) as Array<{ name: string; url: string }>;
+    if (!Array.isArray(arr)) return [];
+    const out: Array<{ name: string; symbol: string; exchange: string }> = [];
+    const seen = new Set<string>();
+    for (const c of arr) {
+      const sym = (/\/company\/([^/]+)\//.exec(c.url ?? "")?.[1] ?? "").trim();
+      const name = (c.name ?? "").trim();
+      if (!sym || !name || seen.has(sym.toUpperCase())) continue;
+      seen.add(sym.toUpperCase());
+      out.push({ name, symbol: sym, exchange: /^\d+$/.test(sym) ? "BSE" : "NSE" });
+      if (out.length >= 7) break;
+    }
+    return out;
+  } catch {
+    return [];
+  }
+}
+
 function screenerMonthISO(label: string): string | null {
   const m = /([A-Za-z]{3,})\s+(\d{4})/.exec(label ?? "");
   if (!m) return null;
@@ -537,7 +580,7 @@ function parseScreenerConcalls(html: string): CompanyFiling[] {
       links.find((l) => /transcript/i.test(l.label)) ?? links.find((l) => /ppt/i.test(l.label)) ?? links[0];
     // Credit Screener as the aggregator that surfaced the concall; the individual
     // links keep their real host (BSE/NSE/company) for provenance.
-    out.push({ category: "CONCALL", title: `Concall · ${label}`, date: iso, links, url: primary.url, source: "Screener" });
+    out.push({ category: "CONCALL", title: `Earnings Call · ${label}`, date: iso, links, url: primary.url, source: "Screener" });
   }
   return out.slice(0, 12);
 }
@@ -712,6 +755,13 @@ export default {
         );
       }
       return cachedJson(request, ctx, () => buildCompanyFilings(name, symbol));
+    }
+    if (url.pathname === "/api/company-search") {
+      const q = url.searchParams.get("q") ?? "";
+      if (q.trim().length < 2) {
+        return new Response(JSON.stringify({ results: [] }), { headers: { "Content-Type": "application/json" } });
+      }
+      return cachedJson(request, ctx, async () => ({ results: await searchCompanies(q) }));
     }
     if (url.pathname === "/api/health") {
       return new Response(JSON.stringify({ ok: true }), {
