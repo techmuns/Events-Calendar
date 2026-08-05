@@ -42,6 +42,20 @@ export const CalendarIcon = (p: P) => (
   </Svg>
 );
 
+export const HomeIcon = (p: P) => (
+  <Svg {...p}>
+    <path d="M3 10.5 12 3l9 7.5" />
+    <path d="M5 9.5V20a1 1 0 0 0 1 1h4v-6h4v6h4a1 1 0 0 0 1-1V9.5" />
+  </Svg>
+);
+
+export const BellIcon = (p: P) => (
+  <Svg {...p}>
+    <path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9" />
+    <path d="M13.73 21a2 2 0 0 1-3.46 0" />
+  </Svg>
+);
+
 export const RefreshIcon = (p: P) => (
   <Svg {...p}>
     <polyline points="23 4 23 10 17 10" />

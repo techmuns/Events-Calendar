@@ -18,12 +18,12 @@ import { EventModal } from "./components/EventModal";
 import { useTheme } from "./hooks/useTheme";
 import { useWatchlist } from "./hooks/useWatchlist";
 import { useEventDiff } from "./hooks/useEventDiff";
-import { CalendarIcon, MoonIcon, RefreshIcon, SunIcon } from "./components/icons";
+import { HomeIcon, MoonIcon, RefreshIcon, SunIcon } from "./components/icons";
 
 const DEFAULT_FILTERS: Filters = {
   universe: "ALL",
   types: ["EARNINGS", "DEMERGER"],
-  horizonDays: 90,
+  horizonDays: 14,
   search: "",
 };
 
@@ -241,7 +241,7 @@ export default function App() {
                 flexShrink: 0,
               }}
             >
-              <CalendarIcon size={19} />
+              <HomeIcon size={19} />
             </div>
             <div style={{ minWidth: 0 }}>
               <h1 style={{ fontSize: 16, fontWeight: 700, color: "#fff", margin: 0, letterSpacing: "-0.01em", whiteSpace: "nowrap" }}>

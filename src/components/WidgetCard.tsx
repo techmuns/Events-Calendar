@@ -48,7 +48,7 @@ export function WidgetCard({
             {title}
           </h3>
           {subtitle && (
-            <p style={{ margin: "2px 0 0", fontSize: 11.5, color: tokens.textHint, lineHeight: 1.3 }}>
+            <p style={{ margin: "2px 0 0", fontSize: 12, fontWeight: 600, color: tokens.textSecondary, lineHeight: 1.3 }}>
               {subtitle}
             </p>
           )}

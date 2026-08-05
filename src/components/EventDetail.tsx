@@ -1,12 +1,11 @@
 import { useEffect, useState } from "react";
 import type { CSSProperties } from "react";
 import type { CompanyFiling, CorporateEvent, FilingCategory, FilingSource } from "../types";
-import { companyAccent, eventTypeMeta, filingCategoryMeta, initials, tokens } from "../theme";
+import { companyAccent, eventTypeMeta, filingCategoryMeta, tokens } from "../theme";
 import {
   CalendarIcon,
   DownloadIcon,
   ExternalLinkIcon,
-  EyeIcon,
   FileTextIcon,
   LayersIcon,
   MicIcon,
@@ -16,7 +15,7 @@ import {
   UsersIcon,
 } from "./icons";
 import { parseISO } from "../lib/dates";
-import { downloadIcs } from "../lib/ics";
+import { downloadEventPdf } from "../lib/pdf";
 import { useCompanyFilings } from "../hooks/useCompanyFilings";
 
 const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
@@ -98,7 +97,7 @@ function LinkAction({ label, url }: { label: string; url: string }) {
       : /transcript|note/.test(l)
         ? FileTextIcon
         : ExternalLinkIcon;
-  const nice = /ppt/.test(l) ? "Slides" : /rec/.test(l) ? "Listen" : label;
+  const nice = /rec|listen|audio/.test(l) ? "Audio" : /transcript|note/.test(l) ? "Transcript" : /ppt|slide/.test(l) ? "Slides" : label;
   return (
     <a href={url} target="_blank" rel="noreferrer" style={chipBtn}>
       <Icon size={13} /> {nice}
@@ -112,74 +111,71 @@ function DocumentCard({ f, accent }: { f: CompanyFiling; accent: string }) {
     <div
       className="card-hover"
       style={{
+        display: "flex",
+        alignItems: "center",
+        gap: 11,
         border: `1px solid ${tokens.border}`,
         borderLeft: `3px solid ${accent}`,
         borderRadius: 13,
-        padding: 12,
+        padding: "10px 12px",
         background: tokens.surface,
         boxShadow: tokens.shadowCard,
       }}
     >
-      <div style={{ display: "flex", gap: 11, alignItems: "flex-start" }}>
-        <span
+      <span
+        style={{
+          flexShrink: 0,
+          width: 38,
+          height: 38,
+          borderRadius: 10,
+          display: "inline-flex",
+          alignItems: "center",
+          justifyContent: "center",
+          color: cat.hex,
+          background: cat.bg,
+          border: `1px solid ${cat.border}`,
+        }}
+      >
+        <FileTextIcon size={18} />
+      </span>
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <div
           style={{
-            flexShrink: 0,
-            width: 38,
-            height: 38,
-            borderRadius: 10,
-            display: "inline-flex",
-            alignItems: "center",
-            justifyContent: "center",
-            color: cat.hex,
-            background: cat.bg,
-            border: `1px solid ${cat.border}`,
+            fontSize: 13,
+            fontWeight: 600,
+            color: tokens.textPrimary,
+            lineHeight: 1.35,
+            display: "-webkit-box",
+            WebkitLineClamp: 2,
+            WebkitBoxOrient: "vertical",
+            overflow: "hidden",
           }}
         >
-          <FileTextIcon size={18} />
-        </span>
-        <div style={{ flex: 1, minWidth: 0 }}>
-          <div
-            style={{
-              fontSize: 13,
-              fontWeight: 600,
-              color: tokens.textPrimary,
-              lineHeight: 1.35,
-              display: "-webkit-box",
-              WebkitLineClamp: 2,
-              WebkitBoxOrient: "vertical",
-              overflow: "hidden",
-            }}
-          >
-            {f.title}
-          </div>
-          <div style={{ display: "flex", alignItems: "center", gap: 7, marginTop: 5, flexWrap: "wrap" }}>
-            <span style={{ fontSize: 11.5, color: tokens.textHint }}>{shortDate(f.date)}</span>
-            <SourceBadge source={f.source} />
-            <span style={{ fontSize: 9.5, fontWeight: 700, color: "#dc2626" }}>PDF</span>
-          </div>
+          {f.title}
+        </div>
+        <div style={{ display: "flex", alignItems: "center", gap: 7, marginTop: 4, flexWrap: "wrap" }}>
+          <span style={{ fontSize: 11.5, color: tokens.textHint }}>{shortDate(f.date)}</span>
+          <SourceBadge source={f.source} />
+          <span style={{ fontSize: 9.5, fontWeight: 700, color: "#dc2626" }}>PDF</span>
         </div>
       </div>
       {f.url && (
-        <div style={{ display: "flex", gap: 8, marginTop: 11 }}>
-          <a href={f.url} target="_blank" rel="noreferrer" style={{ ...chipBtn, flex: 1 }}>
-            <EyeIcon size={13} /> Preview
-          </a>
-          <a
-            href={f.url}
-            target="_blank"
-            rel="noreferrer"
-            style={{
-              ...chipBtn,
-              flex: 1,
-              color: "#fff",
-              background: `linear-gradient(135deg, ${accent} 0%, color-mix(in srgb, ${accent} 74%, #000) 100%)`,
-              border: "none",
-              boxShadow: `0 1px 3px color-mix(in srgb, ${accent} 45%, transparent)`,
-            }}
-          >
-            <ExternalLinkIcon size={13} /> Open Filing
-          </a>
-        </div>
+        <a
+          href={f.url}
+          target="_blank"
+          rel="noreferrer"
+          style={{
+            ...chipBtn,
+            flexShrink: 0,
+            whiteSpace: "nowrap",
+            color: "#fff",
+            background: `linear-gradient(135deg, ${accent} 0%, color-mix(in srgb, ${accent} 74%, #000) 100%)`,
+            border: "none",
+            boxShadow: `0 1px 3px color-mix(in srgb, ${accent} 45%, transparent)`,
+          }}
+        >
+          <ExternalLinkIcon size={13} /> Open Filing
+        </a>
       )}
     </div>
   );
@@ -222,11 +218,19 @@ function ConcallCard({ f, accent }: { f: CompanyFiling; accent: string }) {
           </div>
         </div>
       </div>
-      <div style={{ display: "flex", gap: 8, marginTop: 11, flexWrap: "wrap" }}>
-        {(f.links ?? []).map((l, i) => (
-          <LinkAction key={`${l.url}_${i}`} label={l.label} url={l.url} />
-        ))}
-      </div>
+      {(() => {
+        // Show the audio recording and the text transcript; drop the slide deck.
+        const links = (f.links ?? []).filter((l) => !/ppt|slide|deck/i.test(l.label));
+        return (
+          <div style={{ display: "flex", gap: 8, marginTop: 11, flexWrap: "wrap", alignItems: "center" }}>
+            {links.length ? (
+              links.map((l, i) => <LinkAction key={`${l.url}_${i}`} label={l.label} url={l.url} />)
+            ) : (
+              <span style={{ fontSize: 11.5, color: tokens.textHint }}>Audio & text transcript expected within a few days</span>
+            )}
+          </div>
+        );
+      })()}
     </div>
   );
 }
@@ -411,9 +415,8 @@ export function EventDetail({
               background: accentGrad,
               boxShadow: `0 4px 12px color-mix(in srgb, ${accent} 40%, transparent)`,
             }}
-          >
-            {initials(event.company)}
-          </span>
+          />
+
           <div style={{ minWidth: 0 }}>
             <div
               style={{
@@ -489,14 +492,9 @@ export function EventDetail({
           >
             <StarIcon size={14} filled={starred} /> {starred ? "Watchlisted" : "Watchlist"}
           </button>
-          <button onClick={() => downloadIcs(event)} style={{ ...chipBtn, flex: 1 }}>
+          <button onClick={() => downloadEventPdf(event)} style={{ ...chipBtn, flex: 1 }}>
             <DownloadIcon size={14} /> Calendar
           </button>
-          {event.sourceUrl && (
-            <a href={event.sourceUrl} target="_blank" rel="noreferrer" style={{ ...chipBtn, flex: 1 }}>
-              <ExternalLinkIcon size={14} /> Filing
-            </a>
-          )}
         </div>
       </div>
 

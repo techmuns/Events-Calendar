@@ -10,7 +10,7 @@ const UNIVERSES: { key: Universe; label: string }[] = [
   { key: "NIFTY500", label: "Nifty 500" },
   { key: "ALL", label: "All" },
 ];
-const HORIZONS = [7, 30, 90];
+const HORIZONS = [7, 14];
 const TYPES: EventType[] = ["EARNINGS", "DEMERGER"];
 
 // Dark-mode Event Type palette. Each category owns its accent (Earnings blue,

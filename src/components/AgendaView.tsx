@@ -2,7 +2,7 @@ import { useState } from "react";
 import type { CSSProperties } from "react";
 import type { CorporateEvent } from "../types";
 import type { EventDiff } from "../hooks/useEventDiff";
-import { companyAccent, eventTypeMeta, initials, statusMeta, tokens } from "../theme";
+import { companyAccent, tokens } from "../theme";
 import { ChangeBadge } from "./badges";
 import { EmptyState } from "./states";
 import { ClockIcon, ExternalLinkIcon, StarIcon } from "./icons";
@@ -39,56 +39,6 @@ function DateBlock({ iso, accent }: { iso: string; accent: string }) {
   );
 }
 
-function Avatar({ name, seed }: { name: string; seed: string }) {
-  const accent = companyAccent(seed);
-  return (
-    <span
-      style={{
-        flexShrink: 0,
-        width: 34,
-        height: 34,
-        borderRadius: 10,
-        display: "inline-flex",
-        alignItems: "center",
-        justifyContent: "center",
-        fontSize: 12,
-        fontWeight: 800,
-        letterSpacing: "0.01em",
-        color: accent,
-        background: `color-mix(in srgb, ${accent} 13%, transparent)`,
-        border: `1px solid color-mix(in srgb, ${accent} 26%, transparent)`,
-      }}
-    >
-      {initials(name)}
-    </span>
-  );
-}
-
-function TypeChip({ type, active }: { type: CorporateEvent["eventType"]; active?: boolean }) {
-  const m = eventTypeMeta[type];
-  return (
-    <span
-      style={{
-        display: "inline-flex",
-        alignItems: "center",
-        gap: 5,
-        fontSize: 10.5,
-        fontWeight: active ? 700 : 600,
-        padding: "2px 8px",
-        borderRadius: 7,
-        background: active ? `color-mix(in srgb, ${m.hex} 17%, transparent)` : m.bg,
-        color: m.text,
-        border: `1px solid ${active ? `color-mix(in srgb, ${m.hex} 44%, transparent)` : m.border}`,
-        whiteSpace: "nowrap",
-        transition: "background 160ms ease, border-color 160ms ease",
-      }}
-    >
-      <span style={{ width: 6, height: 6, borderRadius: "50%", background: m.hex }} />
-      {m.label}
-    </span>
-  );
-}
-
 function EventRow({
   e,
   diff,
@@ -101,7 +51,6 @@ function EventRow({
   const [hovered, setHovered] = useState(false);
   const starred = isStarred(e.ticker);
   const accent = companyAccent(e.ticker || e.company);
-  const status = statusMeta[e.status];
 
   // Three visual states, scoped to the light theme so dark mode is untouched:
   //   default  → neutral, transparent
@@ -172,7 +121,6 @@ function EventRow({
         <StarIcon size={17} filled={starred} />
       </button>
       <DateBlock iso={e.date} accent={accent} />
-      <Avatar name={e.company} seed={e.ticker || e.company} />
       <div style={{ flex: 1, minWidth: 0 }}>
         <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
           <span
@@ -189,7 +137,6 @@ function EventRow({
             {e.company}
           </span>
           <span style={{ fontSize: 11.5, fontWeight: 600, color: warm ? tokens.textSecondary : tokens.textHint }}>{e.ticker}</span>
-          {diff?.isNew && <ChangeBadge kind="new" />}
           {diff?.isRevised && <ChangeBadge kind="moved" />}
         </div>
         <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 3, fontSize: 12, color: warm ? tokens.textSecondary : tokens.textMuted }}>
@@ -214,49 +161,52 @@ function EventRow({
         </div>
       </div>
       <div style={{ display: "flex", alignItems: "center", gap: 8, flexShrink: 0 }}>
-        <TypeChip type={e.eventType} active={warm} />
-        <span
-          title={`${status.label} · ${e.exchange}`}
-          style={{
-            display: "inline-flex",
-            alignItems: "center",
-            gap: 5,
-            fontSize: 10.5,
-            fontWeight: 600,
-            color: warm ? tokens.textSecondary : tokens.textMuted,
-            background: tokens.surface2,
-            border: `1px solid ${warm ? tokens.borderStrong : tokens.border}`,
-            borderRadius: 7,
-            padding: "2px 8px",
-            whiteSpace: "nowrap",
-            transition: "color 160ms ease, border-color 160ms ease",
-          }}
-        >
-          <span style={{ width: 6, height: 6, borderRadius: "50%", background: status.hex }} />
-          {e.exchange}
-        </span>
+        {diff?.isNew && (
+          <span
+            title="Newly announced since your last visit"
+            style={{
+              display: "inline-flex",
+              alignItems: "center",
+              gap: 5,
+              fontSize: 10.5,
+              fontWeight: 700,
+              color: "#059669",
+              background: "color-mix(in srgb, #10b981 13%, transparent)",
+              border: "1px solid color-mix(in srgb, #10b981 34%, transparent)",
+              borderRadius: 7,
+              padding: "2px 9px",
+              whiteSpace: "nowrap",
+            }}
+          >
+            <span style={{ width: 6, height: 6, borderRadius: "50%", background: "#10b981" }} /> New
+          </span>
+        )}
         {e.sourceUrl && (
           <a
             href={e.sourceUrl}
             target="_blank"
             rel="noreferrer"
-            title="View exchange filing"
+            title={`Open ${e.exchange} filing`}
             onClick={(ev) => ev.stopPropagation()}
             style={{
               display: "inline-flex",
               alignItems: "center",
               justifyContent: "center",
-              width: 30,
+              gap: 6,
               height: 30,
+              padding: "0 11px",
               borderRadius: 8,
-              color: warm ? accent : tokens.textMuted,
+              fontSize: 12,
+              fontWeight: 600,
+              textDecoration: "none",
+              color: warm ? accent : tokens.textSecondary,
               border: `1px solid ${warm ? `color-mix(in srgb, ${accent} 40%, transparent)` : tokens.border}`,
               background: warm ? `color-mix(in srgb, ${accent} 10%, ${tokens.surface})` : tokens.surface,
               flexShrink: 0,
               transition: "color 160ms ease, border-color 160ms ease, background 160ms ease",
             }}
           >
-            <ExternalLinkIcon size={14} />
+            {e.exchange} <ExternalLinkIcon size={13} />
           </a>
         )}
       </div>
