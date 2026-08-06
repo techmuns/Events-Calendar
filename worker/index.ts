@@ -169,6 +169,20 @@ async function bseJson(path: string): Promise<unknown> {
   return res.json();
 }
 
+// Retry a flaky upstream a few times so a transient network blip doesn't drop a
+// whole source (and its earnings) for the entire cache window.
+async function retry<T>(fn: () => Promise<T>, attempts = 3): Promise<T> {
+  let last: unknown;
+  for (let i = 0; i < attempts; i++) {
+    try {
+      return await fn();
+    } catch (e) {
+      last = e;
+    }
+  }
+  throw last;
+}
+
 // BSE Forthcoming Results (the Result Calendar) — the primary earnings source.
 function parseBseForthResults(data: unknown): CorporateEvent[] {
   if (!Array.isArray(data)) return [];
@@ -644,16 +658,20 @@ async function buildLiveResult() {
   const [constituents, settled, concalls] = await Promise.all([
     fetchConstituents().catch(() => new Map<string, Constituent>()),
     Promise.allSettled([
-      bseJson("/Corpforthresults/w").then(parseBseForthResults),
-      nseJson(
-        `/api/corporate-board-meetings?index=equities&from_date=${nseDate(now)}&to_date=${nseDate(bmTo)}`,
-        `${NSE}/companies-listing/corporate-filings-board-meetings`,
-        cookie,
+      retry(() => bseJson("/Corpforthresults/w")).then(parseBseForthResults),
+      retry(() =>
+        nseJson(
+          `/api/corporate-board-meetings?index=equities&from_date=${nseDate(now)}&to_date=${nseDate(bmTo)}`,
+          `${NSE}/companies-listing/corporate-filings-board-meetings`,
+          cookie,
+        ),
       ).then(parseBoardMeetings),
-      nseJson(
-        "/api/corporates-corporateActions?index=equities",
-        `${NSE}/companies-listing/corporate-filings-actions`,
-        cookie,
+      retry(() =>
+        nseJson(
+          "/api/corporates-corporateActions?index=equities",
+          `${NSE}/companies-listing/corporate-filings-actions`,
+          cookie,
+        ),
       ).then(parseCorporateActions),
     ]),
     nseJson(
