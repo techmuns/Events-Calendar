@@ -528,7 +528,9 @@ function shortHeading(raw: string): string {
   else s = s.replace(/^.*?informed the exchange\s*(?:about|regarding|that|of|:)?\s*/i, "");
   s = s
     .replace(/\((?:formerly|erstwhile)[^)]*\)/gi, "") // drop "(formerly … Limited)"
-    .replace(/^['"“”‘’\s]+/, "")
+    .replace(/^['"“”‘’\s\-–—]+/, "") // leading quotes/dashes (e.g. "titled - X")
+    .replace(/^submission of\s+(?:the\s+)?(?:press release|newspaper (?:advertisement|publication)|disclosure|intimation)\s*/i, "")
+    .replace(/^(?:titled|entitled)\b\s*[:\-–—]*\s*['"“”‘’]?\s*/i, "") // residual "Titled - X"
     .replace(/^(?:sub|subject|re|ref)\s*[:\-]\s*/i, "")
     .replace(/^(?:copy of\s+)?(?:the\s+)?(?:newspaper\s+)?(?:advertisement|publication|intimation|disclosure)\s+(?:dated|for|of)?\s*/i, "")
     .replace(/^dated\s+[a-z0-9 ,.\-]*?\d{4}[,:\-\s]*/i, "") // "Dated June 15, 2026,"
