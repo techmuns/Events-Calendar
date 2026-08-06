@@ -6,7 +6,14 @@ import { useEvents } from "./hooks/useEvents";
 import { useHostContext } from "./hooks/useHostContext";
 import { useCompanySearch } from "./hooks/useCompanySearch";
 import { applyFilters } from "./lib/filter";
-import { formatDate } from "./lib/dates";
+import { formatDate, parseISO } from "./lib/dates";
+
+const RANGE_MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+function fmtRange(iso: string): string {
+  const [y, m, d] = iso.split("-").map(Number);
+  if (!y || !m) return iso;
+  return `${d} ${RANGE_MONTHS[m - 1]}`;
+}
 import { FiltersBar } from "./components/FiltersBar";
 import { KpiRow } from "./components/KpiRow";
 import { AgendaView } from "./components/AgendaView";
@@ -268,20 +275,19 @@ export default function App() {
 
   // "Coming up" reminders: the soonest upcoming events (today onward), watchlist
   // first, then chronological — so the most imminent, most relevant events lead.
+  // Reminders are scoped to the user's watchlist: this banner is "your companies".
+  // Not horizon-limited — a watchlisted company reporting in 3 weeks still matters.
   const reminderEvents = useMemo(() => {
     const today = new Date().toISOString().slice(0, 10);
-    return [...baseFiltered]
-      .filter((e) => e.date >= today)
-      .sort((a, b) => {
-        const wa = watchlist.has(a.ticker) ? 0 : 1;
-        const wb = watchlist.has(b.ticker) ? 0 : 1;
-        if (wa !== wb) return wa - wb;
-        if (a.date !== b.date) return a.date.localeCompare(b.date);
-        return a.company.localeCompare(b.company);
-      })
+    return (result?.events ?? [])
+      .filter((e) => e.date >= today && watchlist.has(e.ticker) && filters.types.includes(e.eventType))
+      .sort((a, b) => a.date.localeCompare(b.date) || a.company.localeCompare(b.company))
       .slice(0, 12);
-  }, [baseFiltered, watchlist]);
-  const watchlistedUpcoming = useMemo(() => baseFiltered.filter((e) => watchlist.has(e.ticker)).length, [baseFiltered, watchlist]);
+  }, [result, watchlist, filters.types]);
+  const watchlistConcalls = useMemo(
+    () => (result?.concalls ?? []).filter((c) => watchlist.has(c.ticker)),
+    [result, watchlist],
+  );
 
   const typeCounts = useMemo(() => {
     const c: Record<EventType, number> = { EARNINGS: 0, CONCALL: 0, DEMERGER: 0 };
@@ -324,7 +330,13 @@ export default function App() {
     ? new Date(result.generatedAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })
     : "";
   const listTitle = view === "month" ? "Calendar" : view === "table" ? "All events" : "Upcoming events";
-  const listSubtitle = result ? `${filtered.length} events · next ${filters.horizonDays} days` : "Loading events…";
+  // A custom date range overrides the day-horizon everywhere the window is shown.
+  const rangeActive = !!(filters.customStart && filters.customEnd);
+  const rangeLabel = rangeActive ? `${fmtRange(filters.customStart!)} – ${fmtRange(filters.customEnd!)}` : `next ${filters.horizonDays} days`;
+  const effectiveHorizon = rangeActive
+    ? Math.max(1, Math.round((parseISO(filters.customEnd!).getTime() - parseISO(filters.customStart!).getTime()) / 86_400_000))
+    : filters.horizonDays;
+  const listSubtitle = result ? `${filtered.length} events · ${rangeLabel}` : "Loading events…";
 
   return (
     <div style={shell}>
@@ -450,10 +462,8 @@ export default function App() {
         {result && !isSearching && (
           <ComingUp
             events={reminderEvents}
-            totalUpcoming={baseFiltered.length}
-            horizonDays={filters.horizonDays}
-            watchlistedCount={watchlistedUpcoming}
-            concalls={result.concalls}
+            watchlistCount={watchlist.set.size}
+            concalls={watchlistConcalls}
             isStarred={watchlist.has}
             onOpenEvent={selectEvent}
             onOpenConcall={openConcall}
@@ -465,7 +475,7 @@ export default function App() {
             events={baseFiltered}
             selectedDay={focusDay}
             onSelectDay={setFocusDay}
-            horizonDays={filters.horizonDays}
+            horizonDays={effectiveHorizon}
           />
         )}
 

@@ -32,18 +32,14 @@ const TONE: Record<Tone, { color: string; bg: string; border: string }> = {
 // just-announced earnings calls expand on click, like the density panel.
 export function ComingUp({
   events,
-  totalUpcoming,
-  horizonDays,
-  watchlistedCount,
+  watchlistCount,
   concalls,
   isStarred,
   onOpenEvent,
   onOpenConcall,
 }: {
   events: CorporateEvent[];
-  totalUpcoming: number;
-  horizonDays: number;
-  watchlistedCount: number;
+  watchlistCount: number;
   concalls: ConcallItem[];
   isStarred: (ticker: string) => boolean;
   onOpenEvent: (e: CorporateEvent) => void;
@@ -52,7 +48,52 @@ export function ComingUp({
   const [open, setOpen] = usePersistedOpen("ec_comingup_open", false);
   const reminders = events.slice(0, 12);
   const calls = concalls.slice(0, 12);
-  if (reminders.length === 0 && calls.length === 0) return null;
+  const hasContent = reminders.length > 0 || calls.length > 0;
+
+  // Watchlist has nothing coming up — show a quiet one-line hint instead of the
+  // full panel, so the feature stays discoverable without taking space.
+  if (!hasContent) {
+    return (
+      <div
+        style={{
+          display: "flex",
+          alignItems: "center",
+          gap: 12,
+          background: tokens.cardBg,
+          border: `1px solid ${tokens.border}`,
+          borderRadius: 16,
+          boxShadow: tokens.shadowCard,
+          padding: "11px 14px",
+          flexShrink: 0,
+        }}
+      >
+        <span
+          style={{
+            width: 34,
+            height: 34,
+            borderRadius: 10,
+            display: "inline-flex",
+            alignItems: "center",
+            justifyContent: "center",
+            color: tokens.primary,
+            background: tokens.primaryLight,
+            border: `1px solid ${tokens.primaryBorder}`,
+            flexShrink: 0,
+          }}
+        >
+          <BellIcon size={17} />
+        </span>
+        <div style={{ minWidth: 0 }}>
+          <div style={{ fontSize: 13.5, fontWeight: 700, color: tokens.textPrimary, letterSpacing: "-0.01em" }}>Coming up</div>
+          <div style={{ fontSize: 12, color: tokens.textMuted, marginTop: 1 }}>
+            {watchlistCount === 0
+              ? "Tap the ☆ on any company to watchlist it and get its events here."
+              : "No upcoming events for your watchlisted companies right now."}
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   const next = reminders[0];
   const nextProx = next ? proximity(next.date) : null;
@@ -132,13 +173,9 @@ export function ComingUp({
                 </span>
               </>
             ) : (
-              "Recently announced earnings calls"
+              "Earnings calls from your watchlist"
             )}
-            <span style={{ color: tokens.textHint }}>
-              {" "}
-              · {totalUpcoming.toLocaleString("en-IN")} in the next {horizonDays} days
-              {watchlistedCount > 0 ? ` · ${watchlistedCount} on your watchlist` : ""}
-            </span>
+            <span style={{ color: tokens.textHint }}> · from your watchlist</span>
           </div>
         </div>
         <span style={{ flex: 1 }} />

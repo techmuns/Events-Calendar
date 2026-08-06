@@ -24,9 +24,11 @@ export function applyFilters(
 ): CorporateEvent[] {
   const today = todayStart();
   const q = f.search.trim().toLowerCase();
+  const customRange = f.customStart && f.customEnd ? { start: f.customStart, end: f.customEnd } : null;
   return events
     .filter((e) => f.types.includes(e.eventType))
     .filter((e) => {
+      if (customRange) return e.date >= customRange.start && e.date <= customRange.end;
       const d = diffDays(today, parseISO(e.date));
       return d >= 0 && d <= f.horizonDays;
     })

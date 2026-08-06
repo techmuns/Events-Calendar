@@ -95,5 +95,7 @@ export interface Filters {
   universe: Universe;
   types: EventType[]; // which event types are visible
   horizonDays: number; // only show events within this many days from today
+  customStart?: string; // ISO — when set with customEnd, overrides horizonDays
+  customEnd?: string; // ISO — inclusive end of a custom date range
   search: string;
 }

@@ -2,7 +2,14 @@ import { useEffect, useState } from "react";
 import type { CSSProperties } from "react";
 import type { EventType, Filters, Universe } from "../types";
 import { eventTypeMeta, tokens } from "../theme";
-import { SearchIcon } from "./icons";
+import { CalendarIcon, SearchIcon } from "./icons";
+
+const MO = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+function shortDay(iso: string): string {
+  const [y, m, d] = iso.split("-").map(Number);
+  if (!y || !m) return iso;
+  return `${d} ${MO[m - 1]}`;
+}
 
 const UNIVERSES: { key: Universe; label: string }[] = [
   { key: "WATCHLIST", label: "Watchlist" },
@@ -111,55 +118,141 @@ function Divider() {
   return <div style={{ width: 1, alignSelf: "stretch", background: tokens.border, margin: "0 2px" }} />;
 }
 
-// Free-form horizon: type any number of days when the 7/30/90 presets don't fit.
-function CustomHorizon({ value, onChange }: { value: number; onChange: (v: number) => void }) {
-  const isCustom = !HORIZONS.includes(value);
-  const [text, setText] = useState(isCustom ? String(value) : "");
+// Custom horizon: pick an explicit From–To date range in a small popover.
+function CustomRange({
+  start,
+  end,
+  onApply,
+  onClear,
+}: {
+  start?: string;
+  end?: string;
+  onApply: (s: string, e: string) => void;
+  onClear: () => void;
+}) {
+  const active = !!(start && end);
+  const [open, setOpen] = useState(false);
+  const [from, setFrom] = useState(start ?? "");
+  const [to, setTo] = useState(end ?? "");
   useEffect(() => {
-    setText(isCustom ? String(value) : "");
-  }, [value, isCustom]);
+    setFrom(start ?? "");
+    setTo(end ?? "");
+  }, [start, end]);
+
+  const dateInput: CSSProperties = {
+    fontFamily: tokens.font,
+    fontSize: 13,
+    fontWeight: 600,
+    color: tokens.textPrimary,
+    background: tokens.surface,
+    border: `1px solid ${tokens.border}`,
+    borderRadius: 8,
+    padding: "6px 9px",
+    outline: "none",
+    colorScheme: "light dark",
+  };
 
   return (
-    <div
-      title="Custom horizon (days)"
-      style={{
-        display: "inline-flex",
-        alignItems: "center",
-        gap: 3,
-        borderRadius: 10,
-        padding: "4px 10px",
-        border: `1px solid ${isCustom ? tokens.primary : tokens.border}`,
-        background: isCustom ? tokens.primaryLight : tokens.surface2,
-        boxShadow: isCustom ? `0 0 0 3px color-mix(in srgb, ${tokens.primary} 14%, transparent)` : "none",
-        transition: "all 0.2s",
-      }}
-    >
-      <input
-        type="text"
-        inputMode="numeric"
-        value={text}
-        onChange={(e) => {
-          const digits = e.target.value.replace(/[^0-9]/g, "").slice(0, 3);
-          setText(digits);
-          const n = parseInt(digits, 10);
-          if (!Number.isNaN(n) && n > 0) onChange(Math.min(365, n));
-        }}
-        onBlur={() => setText(isCustom ? String(value) : "")}
-        placeholder="Custom"
-        aria-label="Custom horizon in days"
+    <div style={{ position: "relative" }}>
+      <button
+        onClick={() => setOpen((o) => !o)}
+        title="Pick a custom date range"
         style={{
-          width: 60,
-          border: "none",
-          outline: "none",
-          background: "transparent",
-          fontFamily: tokens.font,
+          display: "inline-flex",
+          alignItems: "center",
+          gap: 6,
+          cursor: "pointer",
           fontSize: 14,
-          fontWeight: isCustom ? 700 : 600,
-          color: isCustom ? tokens.primaryText : tokens.textSecondary,
-          padding: 0,
+          fontWeight: active ? 700 : 600,
+          padding: "7px 12px",
+          borderRadius: 10,
+          border: `1px solid ${active ? tokens.primary : tokens.border}`,
+          background: active ? tokens.primaryLight : tokens.surface2,
+          color: active ? tokens.primaryText : tokens.textSecondary,
+          boxShadow: active ? `0 0 0 3px color-mix(in srgb, ${tokens.primary} 14%, transparent)` : "none",
+          whiteSpace: "nowrap",
+          transition: "all 0.2s",
         }}
-      />
-      {isCustom && <span style={{ fontSize: 12.5, fontWeight: 600, color: tokens.textMuted }}>d</span>}
+      >
+        <CalendarIcon size={14} />
+        {active ? `${shortDay(start!)} – ${shortDay(end!)}` : "Custom"}
+      </button>
+      {open && (
+        <>
+          <div onClick={() => setOpen(false)} style={{ position: "fixed", inset: 0, zIndex: 40 }} />
+          <div
+            style={{
+              position: "absolute",
+              top: "calc(100% + 8px)",
+              left: 0,
+              zIndex: 41,
+              width: 250,
+              background: tokens.cardBg,
+              border: `1px solid ${tokens.border}`,
+              borderRadius: 12,
+              boxShadow: tokens.shadowCard,
+              padding: 14,
+            }}
+          >
+            <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+              <label style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+                <span style={{ fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.04em", color: tokens.textHint }}>From</span>
+                <input type="date" value={from} max={to || undefined} onChange={(e) => setFrom(e.target.value)} style={dateInput} />
+              </label>
+              <label style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+                <span style={{ fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.04em", color: tokens.textHint }}>To</span>
+                <input type="date" value={to} min={from || undefined} onChange={(e) => setTo(e.target.value)} style={dateInput} />
+              </label>
+              <div style={{ display: "flex", gap: 8, marginTop: 2 }}>
+                <button
+                  onClick={() => {
+                    if (from && to) {
+                      const [s, e] = from <= to ? [from, to] : [to, from];
+                      onApply(s, e);
+                      setOpen(false);
+                    }
+                  }}
+                  disabled={!from || !to}
+                  style={{
+                    flex: 1,
+                    cursor: from && to ? "pointer" : "not-allowed",
+                    fontSize: 13,
+                    fontWeight: 700,
+                    padding: "7px 0",
+                    borderRadius: 8,
+                    border: "none",
+                    color: "#fff",
+                    background: from && to ? tokens.gradientBrand : tokens.textHint,
+                    opacity: from && to ? 1 : 0.6,
+                  }}
+                >
+                  Apply
+                </button>
+                {active && (
+                  <button
+                    onClick={() => {
+                      onClear();
+                      setOpen(false);
+                    }}
+                    style={{
+                      cursor: "pointer",
+                      fontSize: 13,
+                      fontWeight: 600,
+                      padding: "7px 12px",
+                      borderRadius: 8,
+                      border: `1px solid ${tokens.border}`,
+                      background: tokens.surface,
+                      color: tokens.textSecondary,
+                    }}
+                  >
+                    Clear
+                  </button>
+                )}
+              </div>
+            </div>
+          </div>
+        </>
+      )}
     </div>
   );
 }
@@ -176,6 +269,7 @@ export function FiltersBar({
   isDark?: boolean;
 }) {
   const [hovered, setHovered] = useState<EventType | null>(null);
+  const customActive = !!(filters.customStart && filters.customEnd);
   const toggleType = (t: EventType) => {
     const has = filters.types.includes(t);
     const next = has ? filters.types.filter((x) => x !== t) : [...filters.types, t];
@@ -294,10 +388,15 @@ export function FiltersBar({
         <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
           <Segmented
             options={HORIZONS.map((h) => ({ key: h, label: `${h}d` }))}
-            value={filters.horizonDays}
-            onChange={(v) => onChange({ ...filters, horizonDays: v })}
+            value={customActive ? -1 : filters.horizonDays}
+            onChange={(v) => onChange({ ...filters, horizonDays: v, customStart: undefined, customEnd: undefined })}
           />
-          <CustomHorizon value={filters.horizonDays} onChange={(v) => onChange({ ...filters, horizonDays: v })} />
+          <CustomRange
+            start={filters.customStart}
+            end={filters.customEnd}
+            onApply={(s, e) => onChange({ ...filters, customStart: s, customEnd: e })}
+            onClear={() => onChange({ ...filters, customStart: undefined, customEnd: undefined })}
+          />
         </div>
       </div>
 
