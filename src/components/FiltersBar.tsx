@@ -2,9 +2,11 @@ import { useEffect, useState } from "react";
 import type { CSSProperties } from "react";
 import type { EventType, Filters, Universe } from "../types";
 import { eventTypeMeta, tokens } from "../theme";
-import { CalendarIcon, SearchIcon } from "./icons";
+import { CalendarIcon, ChevronLeftIcon, ChevronRightIcon, SearchIcon } from "./icons";
+import { WEEKDAY_LABELS, buildMonthMatrix, parseISO, toISO, todayStart } from "../lib/dates";
 
 const MO = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+const MONTH_FULL = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
 function shortDay(iso: string): string {
   const [y, m, d] = iso.split("-").map(Number);
   if (!y || !m) return iso;
@@ -132,24 +134,51 @@ function CustomRange({
 }) {
   const active = !!(start && end);
   const [open, setOpen] = useState(false);
-  const [from, setFrom] = useState(start ?? "");
-  const [to, setTo] = useState(end ?? "");
+  const [from, setFrom] = useState<string | null>(start ?? null);
+  const [to, setTo] = useState<string | null>(end ?? null);
+  const [view, setView] = useState(() => {
+    const d = start ? parseISO(start) : todayStart();
+    return { y: d.getFullYear(), m: d.getMonth() };
+  });
   useEffect(() => {
-    setFrom(start ?? "");
-    setTo(end ?? "");
+    setFrom(start ?? null);
+    setTo(end ?? null);
+    const d = start ? parseISO(start) : todayStart();
+    setView({ y: d.getFullYear(), m: d.getMonth() });
   }, [start, end]);
 
-  const dateInput: CSSProperties = {
-    fontFamily: tokens.font,
-    fontSize: 13,
-    fontWeight: 600,
-    color: tokens.textPrimary,
-    background: tokens.surface,
-    border: `1px solid ${tokens.border}`,
+  // Click one day to set the start, a second (later) day to set the end; a click
+  // before the start, or a click once a range exists, begins a fresh range.
+  const pick = (iso: string) => {
+    if (!from || (from && to)) {
+      setFrom(iso);
+      setTo(null);
+    } else if (iso >= from) {
+      setTo(iso);
+    } else {
+      setTo(from);
+      setFrom(iso);
+    }
+  };
+  const shiftMonth = (delta: number) =>
+    setView((v) => {
+      const m = v.m + delta;
+      return { y: v.y + Math.floor(m / 12), m: ((m % 12) + 12) % 12 };
+    });
+
+  const todayIso = toISO(todayStart());
+  const weeks = buildMonthMatrix(view.y, view.m);
+  const navBtn: CSSProperties = {
+    display: "inline-flex",
+    alignItems: "center",
+    justifyContent: "center",
+    width: 28,
+    height: 28,
     borderRadius: 8,
-    padding: "6px 9px",
-    outline: "none",
-    colorScheme: "light dark",
+    border: `1px solid ${tokens.border}`,
+    background: tokens.surface,
+    color: tokens.textSecondary,
+    cursor: "pointer",
   };
 
   return (
@@ -186,7 +215,7 @@ function CustomRange({
               top: "calc(100% + 8px)",
               left: 0,
               zIndex: 41,
-              width: 250,
+              width: 284,
               background: tokens.cardBg,
               border: `1px solid ${tokens.border}`,
               borderRadius: 12,
@@ -194,61 +223,115 @@ function CustomRange({
               padding: 14,
             }}
           >
-            <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-              <label style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-                <span style={{ fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.04em", color: tokens.textHint }}>From</span>
-                <input type="date" value={from} max={to || undefined} onChange={(e) => setFrom(e.target.value)} style={dateInput} />
-              </label>
-              <label style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-                <span style={{ fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.04em", color: tokens.textHint }}>To</span>
-                <input type="date" value={to} min={from || undefined} onChange={(e) => setTo(e.target.value)} style={dateInput} />
-              </label>
-              <div style={{ display: "flex", gap: 8, marginTop: 2 }}>
-                <button
-                  onClick={() => {
-                    if (from && to) {
-                      const [s, e] = from <= to ? [from, to] : [to, from];
-                      onApply(s, e);
-                      setOpen(false);
-                    }
-                  }}
-                  disabled={!from || !to}
-                  style={{
-                    flex: 1,
-                    cursor: from && to ? "pointer" : "not-allowed",
-                    fontSize: 13,
-                    fontWeight: 700,
-                    padding: "7px 0",
-                    borderRadius: 8,
-                    border: "none",
-                    color: "#fff",
-                    background: from && to ? tokens.gradientBrand : tokens.textHint,
-                    opacity: from && to ? 1 : 0.6,
-                  }}
-                >
-                  Apply
-                </button>
-                {active && (
+            {/* Month navigation */}
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 10 }}>
+              <button onClick={() => shiftMonth(-1)} style={navBtn} aria-label="Previous month">
+                <ChevronLeftIcon size={16} />
+              </button>
+              <span style={{ fontSize: 13.5, fontWeight: 700, color: tokens.textPrimary }}>
+                {MONTH_FULL[view.m]} {view.y}
+              </span>
+              <button onClick={() => shiftMonth(1)} style={navBtn} aria-label="Next month">
+                <ChevronRightIcon size={16} />
+              </button>
+            </div>
+            {/* Weekday labels */}
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(7, 1fr)", gap: 2, marginBottom: 3 }}>
+              {WEEKDAY_LABELS.map((w) => (
+                <div key={w} style={{ textAlign: "center", fontSize: 10, fontWeight: 700, color: tokens.textHint }}>
+                  {w.slice(0, 2)}
+                </div>
+              ))}
+            </div>
+            {/* Day grid */}
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(7, 1fr)", gap: 2 }}>
+              {weeks.flat().map((d, i) => {
+                const iso = toISO(d);
+                const inMonth = d.getMonth() === view.m;
+                const isFrom = iso === from;
+                const isTo = iso === to;
+                const endpoint = isFrom || isTo;
+                const between = !!from && !!to && iso > from && iso < to;
+                const isToday = iso === todayIso;
+                return (
                   <button
-                    onClick={() => {
-                      onClear();
-                      setOpen(false);
-                    }}
+                    key={i}
+                    onClick={() => pick(iso)}
                     style={{
+                      height: 30,
+                      border: "none",
                       cursor: "pointer",
-                      fontSize: 13,
-                      fontWeight: 600,
-                      padding: "7px 12px",
-                      borderRadius: 8,
-                      border: `1px solid ${tokens.border}`,
-                      background: tokens.surface,
-                      color: tokens.textSecondary,
+                      fontFamily: tokens.font,
+                      fontSize: 12.5,
+                      fontWeight: endpoint ? 700 : 600,
+                      borderRadius: endpoint ? 8 : between ? 0 : 8,
+                      color: endpoint ? "#fff" : inMonth ? tokens.textPrimary : tokens.textHint,
+                      background: endpoint ? tokens.primary : between ? tokens.primaryLight : "transparent",
+                      opacity: inMonth ? 1 : 0.4,
+                      boxShadow: isToday && !endpoint ? `inset 0 0 0 1px ${tokens.primaryBorder}` : "none",
+                      transition: "background 0.12s",
                     }}
                   >
-                    Clear
+                    {d.getDate()}
                   </button>
-                )}
-              </div>
+                );
+              })}
+            </div>
+            {/* Selected range summary */}
+            <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 12, fontSize: 12, fontWeight: 600 }}>
+              <span style={{ flex: 1, textAlign: "center", padding: "5px 0", borderRadius: 7, background: from ? tokens.primaryLight : tokens.surface2, color: from ? tokens.primaryText : tokens.textHint, border: `1px solid ${from ? tokens.primaryBorder : tokens.border}` }}>
+                {from ? shortDay(from) : "Start"}
+              </span>
+              <span style={{ color: tokens.textHint }}>→</span>
+              <span style={{ flex: 1, textAlign: "center", padding: "5px 0", borderRadius: 7, background: to ? tokens.primaryLight : tokens.surface2, color: to ? tokens.primaryText : tokens.textHint, border: `1px solid ${to ? tokens.primaryBorder : tokens.border}` }}>
+                {to ? shortDay(to) : "End"}
+              </span>
+            </div>
+            {/* Actions */}
+            <div style={{ display: "flex", gap: 8, marginTop: 10 }}>
+              <button
+                onClick={() => {
+                  if (from) {
+                    onApply(from, to ?? from);
+                    setOpen(false);
+                  }
+                }}
+                disabled={!from}
+                style={{
+                  flex: 1,
+                  cursor: from ? "pointer" : "not-allowed",
+                  fontSize: 13,
+                  fontWeight: 700,
+                  padding: "7px 0",
+                  borderRadius: 8,
+                  border: "none",
+                  color: "#fff",
+                  background: from ? tokens.gradientBrand : tokens.textHint,
+                  opacity: from ? 1 : 0.6,
+                }}
+              >
+                Apply
+              </button>
+              {active && (
+                <button
+                  onClick={() => {
+                    onClear();
+                    setOpen(false);
+                  }}
+                  style={{
+                    cursor: "pointer",
+                    fontSize: 13,
+                    fontWeight: 600,
+                    padding: "7px 12px",
+                    borderRadius: 8,
+                    border: `1px solid ${tokens.border}`,
+                    background: tokens.surface,
+                    color: tokens.textSecondary,
+                  }}
+                >
+                  Clear
+                </button>
+              )}
             </div>
           </div>
         </>
