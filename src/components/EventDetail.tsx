@@ -141,10 +141,11 @@ function DocumentCard({ f, accent }: { f: CompanyFiling; accent: string }) {
       <div style={{ flex: 1, minWidth: 0 }}>
         <div
           style={{
-            fontSize: 13,
-            fontWeight: 600,
+            fontSize: 13.5,
+            fontWeight: 700,
             color: tokens.textPrimary,
-            lineHeight: 1.35,
+            letterSpacing: "-0.01em",
+            lineHeight: 1.3,
             display: "-webkit-box",
             WebkitLineClamp: 2,
             WebkitBoxOrient: "vertical",

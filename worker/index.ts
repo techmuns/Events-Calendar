@@ -415,21 +415,80 @@ function filingTitle(text: string, desc: string): string {
   return label.slice(0, 90);
 }
 
-// Turn terse/jargon exchange wording into a plain-English heading a
-// non-finance user can read (esp. the "Investor Meets" bucket).
-function friendlyTitle(cat: FilingCategory, raw: string): string {
+const MONTH_NUM: Record<string, number> = {
+  jan: 1, january: 1, feb: 2, february: 2, mar: 3, march: 3, apr: 4, april: 4,
+  may: 5, jun: 6, june: 6, jul: 7, july: 7, aug: 8, august: 8, sep: 9, sept: 9,
+  september: 9, oct: 10, october: 10, nov: 11, november: 11, dec: 12, december: 12,
+};
+
+// Derive a compact "Q1 FY27" / "Q4 & FY26" label from a results filing's text
+// ("… for the quarter ended June 30, 2026"). Indian FY runs Apr→Mar.
+function resultsPeriod(raw: string): string | null {
   const t = (raw ?? "").toLowerCase();
+  const m = /ended\s+(?:on\s+)?(?:the\s+)?(?:\d{1,2}(?:st|nd|rd|th)?\s+)?([a-z]{3,9})\.?[\s,]+(?:\d{1,2}(?:st|nd|rd|th)?[\s,]+)?(\d{4})/.exec(t);
+  if (!m) return null;
+  const mon = MONTH_NUM[m[1]];
+  const yr = parseInt(m[2], 10);
+  if (!mon || !yr || yr < 2015 || yr > 2100) return null;
+  const q = mon <= 3 ? "Q4" : mon <= 6 ? "Q1" : mon <= 9 ? "Q2" : "Q3";
+  const fyEnd = mon <= 3 ? yr : yr + 1;
+  const fy = `FY${String(fyEnd).slice(2)}`;
+  const fullYear = mon === 3 && /(?:and\s+year|full\s+year|annual|for the year|year\s+ended)/.test(t);
+  return fullYear ? `Q4 & ${fy}` : `${q} ${fy}`;
+}
+
+// Compress a non-results filing into a short Title-ish heading (no full stop,
+// no lead boilerplate) so cards read as headings, not sentences.
+function shortHeading(raw: string): string {
+  let s = (raw ?? "")
+    .replace(/^.*?informed the exchange\s*(?:about|regarding|that|of|:)?\s*/i, "")
+    .replace(/\s+/g, " ")
+    .trim();
+  // If the filing quotes the actual title ("…, titled 'X'"), prefer that.
+  const titled = /(?:titled|entitled)\s*[:'"“”]?\s*(.+)$/i.exec(s);
+  if (titled) s = titled[1];
+  s = s
+    .replace(/^['"“”‘’\s]+/, "")
+    .replace(/^(?:sub|subject|re|ref)\s*[:\-]\s*/i, "")
+    .replace(
+      /^(?:please find (?:attached|enclosed)(?:\s+(?:herewith|a copy of))?|kindly find|we (?:wish|would like) to inform(?:\s+you)?|this is to inform|we hereby inform|pursuant to|with reference to|in reference to)\s*(?:that|of|about|the|:|,|-|—)?\s*/i,
+      "",
+    )
+    .replace(
+      /^(?:a\s+)?(?:media release|press release|press note|intimation|disclosure|announcement|update|corrigendum|clarification)\s*(?:by|relating to|regarding|of|on|under|about|for|from|:|-|—|,)?\s*/i,
+      "",
+    )
+    .replace(/\s+/g, " ")
+    .trim()
+    .replace(/['"“”‘’.;:,\s]+$/, "");
+  const words = s.split(" ").filter(Boolean);
+  if (words.length > 9) s = words.slice(0, 9).join(" ") + "…";
+  s = s.trim();
+  if (s.length < 3 || !/[a-z]/i.test(s)) return ""; // reject junk / punctuation-only
+  return s.charAt(0).toUpperCase() + s.slice(1);
+}
+
+// Turn a terse/sentence filing text into a proper, short heading — never a full
+// sentence — consistently across every company, event and tab.
+function friendlyTitle(cat: FilingCategory, rawText: string, desc: string): string {
+  const raw = rawText || desc || "";
+  const t = raw.toLowerCase();
+  const period = resultsPeriod(raw);
+  const isResults =
+    /financial result|results for|quarter ended|year ended|unaudited|audited (?:financial|standalone|consolidated)|quarterly result/.test(t);
+
+  if (cat === "PRESENTATION") return period ? `${period} Results Presentation` : "Investor Presentation";
+  if (cat === "CONCALL") return period ? `Earnings Call · ${period}` : "Earnings Call";
+  if (cat === "SCHEME") return shortHeading(rawText || desc) || "Corporate Action";
   if (cat === "MEET") {
-    if (/transcript/.test(t)) return "Earnings Call — Transcript";
-    if (/recording|audio|\brec\b/.test(t)) return "Earnings Call — Audio Recording";
-    if (/presentation|\bppt\b/.test(t)) return "Investor Presentation";
-    if (/schedule|intimation|notice/.test(t)) return "Analyst / Investor Meeting";
-    if (/outcome|proceeding|summary|update/.test(t)) return "Investor Meeting — Update";
-    if (/investor|analyst|institutional|con\.? ?call/.test(t)) return "Analyst / Investor Meeting";
-    if (raw.trim().length < 10) return "Analyst / Investor Meeting";
+    if (/transcript/.test(t)) return period ? `Earnings Call Transcript · ${period}` : "Earnings Call — Transcript";
+    if (/recording|audio|\brec\b/.test(t)) return period ? `Earnings Call Audio · ${period}` : "Earnings Call — Audio";
+    if (/presentation|\bppt\b/.test(t)) return period ? `${period} Results Presentation` : "Investor Presentation";
+    return "Analyst / Investor Meeting";
   }
-  if (cat === "PRESENTATION") return raw.trim().length < 10 ? "Investor Presentation" : raw;
-  return raw;
+  // PRESS (and any default)
+  if (isResults) return period ? `${period} Financial Results` : "Financial Results";
+  return shortHeading(rawText || desc) || "Press Release";
 }
 
 function parseCompanyFilings(data: unknown): CompanyFiling[] {
@@ -444,7 +503,7 @@ function parseCompanyFilings(data: unknown): CompanyFiling[] {
     const date = anyDate(r.an_dt) ?? anyDate(r.sort_date ?? "");
     if (!date) continue;
     seen.add(url);
-    out.push({ category: cat, title: friendlyTitle(cat, filingTitle(r.attchmntText ?? "", r.desc ?? "")), date, url, source: hostSource(url) });
+    out.push({ category: cat, title: friendlyTitle(cat, r.attchmntText ?? "", r.desc ?? ""), date, url, source: hostSource(url) });
   }
   out.sort((a, b) => b.date.localeCompare(a.date));
   return out.slice(0, 40);
