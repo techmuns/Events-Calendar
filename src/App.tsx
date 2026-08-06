@@ -1,6 +1,6 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import type { CSSProperties, ReactNode } from "react";
-import type { CompanyMatch, CorporateEvent, EventType, Filters } from "./types";
+import type { CompanyMatch, ConcallItem, CorporateEvent, EventType, Filters } from "./types";
 import { companyAccent, tokens } from "./theme";
 import { useEvents } from "./hooks/useEvents";
 import { useHostContext } from "./hooks/useHostContext";
@@ -16,6 +16,7 @@ import { WidgetCard } from "./components/WidgetCard";
 import { EmptyState, ErrorState, ShimmerRows } from "./components/states";
 import { DensityCard } from "./components/DensityCard";
 import { EventModal } from "./components/EventModal";
+import { WhatsNew } from "./components/WhatsNew";
 import { useTheme } from "./hooks/useTheme";
 import { useWatchlist } from "./hooks/useWatchlist";
 import { useEventDiff } from "./hooks/useEventDiff";
@@ -195,6 +196,8 @@ export default function App() {
   const watchlist = useWatchlist();
   const [selected, setSelected] = useState<CorporateEvent | null>(null);
   const [focusDay, setFocusDay] = useState<string | null>(null);
+  const [onlyNew, setOnlyNew] = useState(false);
+  const [newsDismissed, setNewsDismissed] = useState(false);
 
   const selectEvent = (e: CorporateEvent) => {
     setSelected(e);
@@ -252,6 +255,20 @@ export default function App() {
   let newCount = 0;
   let revCount = 0;
   diffs.forEach((d) => (d.isNew ? newCount++ : d.isRevised ? revCount++ : null));
+
+  // New / rescheduled within the current view — drives the "What's new" banner
+  // and its "show new only" toggle.
+  const newInView = useMemo(() => filtered.filter((e) => diffs.get(e.id)?.isNew), [filtered, diffs]);
+  const revInViewCount = useMemo(() => filtered.filter((e) => diffs.get(e.id)?.isRevised).length, [filtered, diffs]);
+  const agendaEvents = onlyNew ? newInView : filtered;
+  const openConcall = (c: ConcallItem) => openProfile({ name: c.company, symbol: c.ticker, exchange: c.exchange });
+
+  // Re-show the banner (and clear the new-only filter) whenever fresh data loads.
+  const generatedAt = result?.generatedAt;
+  useEffect(() => {
+    setNewsDismissed(false);
+    setOnlyNew(false);
+  }, [generatedAt]);
 
   const typeCounts = useMemo(() => {
     const c: Record<EventType, number> = { EARNINGS: 0, CONCALL: 0, DEMERGER: 0 };
@@ -421,6 +438,18 @@ export default function App() {
           <KpiShimmer />
         )}
 
+        {result && !newsDismissed && (
+          <WhatsNew
+            newCount={newInView.length}
+            revCount={revInViewCount}
+            concalls={result.concalls}
+            onlyNew={onlyNew}
+            onToggleNew={() => setOnlyNew((v) => !v)}
+            onOpenCompany={openConcall}
+            onDismiss={() => setNewsDismissed(true)}
+          />
+        )}
+
         {result && baseFiltered.length > 0 && !filters.search.trim() && (
           <DensityCard
             events={baseFiltered}
@@ -473,7 +502,7 @@ export default function App() {
                       )
                     ) : (
                       <AgendaView
-                        events={filtered}
+                        events={agendaEvents}
                         diffs={diffs}
                         selectedId={selected?.id}
                         isDark={isDark}
