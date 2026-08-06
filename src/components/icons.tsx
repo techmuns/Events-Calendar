@@ -111,6 +111,12 @@ export const ChevronRightIcon = (p: P) => (
   </Svg>
 );
 
+export const ChevronDownIcon = (p: P) => (
+  <Svg {...p}>
+    <polyline points="6 9 12 15 18 9" />
+  </Svg>
+);
+
 export const InboxIcon = (p: P) => (
   <Svg {...p}>
     <path d="M22 12h-6l-2 3h-4l-2-3H2" />
