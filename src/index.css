@@ -293,8 +293,8 @@ input::placeholder {
   overflow: hidden;
   display: flex;
   flex-direction: column;
-  padding: 16px 20px;
-  gap: 14px;
+  padding: 14px 20px;
+  gap: 11px;
 }
 
 .workspace {

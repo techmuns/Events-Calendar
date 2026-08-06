@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import type { CSSProperties, ReactNode } from "react";
 import type { CompanyMatch, ConcallItem, CorporateEvent, EventType, Filters } from "./types";
 import { companyAccent, tokens } from "./theme";
@@ -196,7 +196,6 @@ export default function App() {
   const watchlist = useWatchlist();
   const [selected, setSelected] = useState<CorporateEvent | null>(null);
   const [focusDay, setFocusDay] = useState<string | null>(null);
-  const [newsDismissed, setNewsDismissed] = useState(false);
 
   const selectEvent = (e: CorporateEvent) => {
     setSelected(e);
@@ -283,12 +282,6 @@ export default function App() {
       .slice(0, 12);
   }, [baseFiltered, watchlist]);
   const watchlistedUpcoming = useMemo(() => baseFiltered.filter((e) => watchlist.has(e.ticker)).length, [baseFiltered, watchlist]);
-
-  // Re-show the banner whenever fresh data loads.
-  const generatedAt = result?.generatedAt;
-  useEffect(() => {
-    setNewsDismissed(false);
-  }, [generatedAt]);
 
   const typeCounts = useMemo(() => {
     const c: Record<EventType, number> = { EARNINGS: 0, CONCALL: 0, DEMERGER: 0 };
@@ -454,7 +447,7 @@ export default function App() {
           <KpiShimmer />
         )}
 
-        {result && !newsDismissed && !isSearching && (
+        {result && !isSearching && (
           <ComingUp
             events={reminderEvents}
             totalUpcoming={baseFiltered.length}
@@ -464,7 +457,6 @@ export default function App() {
             isStarred={watchlist.has}
             onOpenEvent={selectEvent}
             onOpenConcall={openConcall}
-            onDismiss={() => setNewsDismissed(true)}
           />
         )}
 

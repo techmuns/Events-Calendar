@@ -1,29 +1,9 @@
-import { useEffect, useState } from "react";
 import type { CSSProperties } from "react";
 import type { CorporateEvent } from "../types";
 import { tokens } from "../theme";
 import { Heatmap, computeDensity, dayLabel } from "./Heatmap";
 import { BarChartIcon } from "./icons";
-
-// Remember whether the density chart is expanded, across reloads.
-function usePersistedOpen(key: string, def: boolean): [boolean, (v: boolean) => void] {
-  const [open, setOpen] = useState<boolean>(() => {
-    try {
-      const s = localStorage.getItem(key);
-      return s === null ? def : s === "1";
-    } catch {
-      return def;
-    }
-  });
-  useEffect(() => {
-    try {
-      localStorage.setItem(key, open ? "1" : "0");
-    } catch {
-      /* ignore */
-    }
-  }, [key, open]);
-  return [open, setOpen];
-}
+import { usePersistedOpen } from "../hooks/usePersistedOpen";
 
 // The "Earnings-season density" chart — a collapsible premium panel.
 export function DensityCard({

@@ -40,12 +40,12 @@ function KpiCard({
     overflow: "hidden",
     background: bg,
     border: `1px solid ${bd}`,
-    borderRadius: 16,
-    padding: "14px 16px 15px",
+    borderRadius: 14,
+    padding: "9px 14px 10px",
     boxShadow: tokens.shadowCard,
     display: "flex",
     alignItems: "center",
-    gap: 13,
+    gap: 11,
   };
   return (
     <div className="card-hover" style={card}>
@@ -63,9 +63,9 @@ function KpiCard({
       <span
         style={{
           flexShrink: 0,
-          width: 40,
-          height: 40,
-          borderRadius: 12,
+          width: 34,
+          height: 34,
+          borderRadius: 10,
           display: "inline-flex",
           alignItems: "center",
           justifyContent: "center",
@@ -74,18 +74,18 @@ function KpiCard({
           border: `1px solid color-mix(in srgb, ${accent} 26%, transparent)`,
         }}
       >
-        <Icon size={20} />
+        <Icon size={17} />
       </span>
       <div style={{ minWidth: 0, position: "relative" }}>
-        <div style={{ fontSize: 10.5, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.05em", color: tokens.textHint }}>
+        <div style={{ fontSize: 9.5, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.05em", color: tokens.textHint }}>
           {label}
         </div>
         <div
           style={{
-            fontSize: 21,
+            fontSize: 18,
             fontWeight: 800,
             color: tokens.textPrimary,
-            lineHeight: 1.15,
+            lineHeight: 1.1,
             letterSpacing: "-0.01em",
             whiteSpace: "nowrap",
             overflow: "hidden",
@@ -94,7 +94,7 @@ function KpiCard({
         >
           {value}
         </div>
-        <div style={{ fontSize: 11.5, color: tokens.textMuted, marginTop: 1, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+        <div style={{ fontSize: 11, color: tokens.textMuted, marginTop: 0, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
           {sub}
         </div>
       </div>
@@ -120,7 +120,7 @@ export function KpiRow({
   const reporting = new Set(events.filter((e) => e.eventType === "EARNINGS").map((e) => e.ticker)).size;
 
   return (
-    <div style={{ display: "grid", gap: 14, gridTemplateColumns: "repeat(auto-fit, minmax(188px, 1fr))" }}>
+    <div style={{ display: "grid", gap: 12, gridTemplateColumns: "repeat(auto-fit, minmax(184px, 1fr))" }}>
       <KpiCard
         label="Next event"
         value={next ? next.ticker : "—"}
