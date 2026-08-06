@@ -437,19 +437,64 @@ function resultsPeriod(raw: string): string | null {
   return fullYear ? `Q4 & ${fy}` : `${q} ${fy}`;
 }
 
+// Decode the HTML entities BSE/NSE embed in filing text — the rupee sign arrives
+// as "&#8377;", ampersands as "&amp;", smart quotes as numeric refs, etc.
+function decodeEntities(s: string): string {
+  return (s ?? "")
+    .replace(/&#x([0-9a-fA-F]+);/g, (_, h) => {
+      const n = parseInt(h, 16);
+      return n > 0 && n <= 0x10ffff ? String.fromCodePoint(n) : "";
+    })
+    .replace(/&#(\d+);/g, (_, d) => {
+      const n = parseInt(d, 10);
+      return n > 0 && n <= 0x10ffff ? String.fromCodePoint(n) : "";
+    })
+    .replace(/&nbsp;/gi, " ")
+    .replace(/&(?:rsquo|lsquo|apos);/gi, "'")
+    .replace(/&(?:rdquo|ldquo|quot);/gi, '"')
+    .replace(/&(?:ndash|mdash);/gi, "–")
+    .replace(/&lt;/gi, "<")
+    .replace(/&gt;/gi, ">")
+    .replace(/&amp;/gi, "&");
+}
+
+// Map a press release onto a short, proper topic heading (never a full sentence),
+// keyword-first so the most salient topic wins. Returns "" when nothing matches.
+function pressTopic(text: string): string {
+  const t = text.toLowerCase();
+  if (/\bcapex\b|capital expenditure/.test(t)) return "Capex Plan";
+  if (/capacity expansion|expansion plan|new (?:plant|facility|unit|capacity)|greenfield|brownfield|debottleneck|commission(?:ing|ed)/.test(t)) return "Capacity Expansion";
+  if (/bagg?ed|secured (?:an?|the|a fresh)?\s*(?:order|contract|project)|(?:new|fresh|repeat|large) order|order (?:worth|of|book|win|inflow|intake)|letter of (?:award|intent)|\bloa\b|work order|contract (?:win|worth|award)|won (?:a |the )?(?:contract|order|project|bid)/.test(t)) return "Order Win";
+  if (/acquisit|acquir(?:e|ing|ed)|majority stake|controlling (?:stake|interest)|joint venture|\bjv\b|amalgamat|\bmerger\b|strategic (?:invest|stake|partnership)/.test(t)) return "Acquisition / JV";
+  if (/buy-?back/.test(t)) return "Share Buyback";
+  if (/\bdividend\b/.test(t)) return "Dividend Update";
+  if (/credit rating|\brating\b[^.]*(?:action|revis|assign|reaffirm|upgrad|downgrad|withdraw)|\bicra\b|crisil|care ratings|india ratings|\bfitch\b|acuit/.test(t)) return "Credit Rating Update";
+  if (/fund[\s-]?rais|\bqip\b|preferential (?:issue|allotment)|rights issue|\bncd\b|debenture|commercial paper|bond issue|\bwarrant/.test(t)) return "Fund Raising";
+  if (/\baward(?:ed|s)?\b|recognit|accolade|honou?red|\branked\b|certif|\bwins?\b[^.]*award/.test(t)) return "Award & Recognition";
+  if (/launch(?:es|ed|ing)?|unveil|introduc|new product|foray|partnership|collaborat|tie-?up|\bmou\b|alliance/.test(t)) return "Business Update";
+  if (/resign|appoint|cessation|(?:re)?designat|\bkmp\b|board of directors|managing director|\bceo\b|\bcfo\b|company secretary/.test(t)) return "Board / Management Update";
+  if (/investor (?:meet|conference|day|presentation)|analyst meet|road ?show|earnings call|con(?:ference)? ?call/.test(t)) return "Investor Update";
+  if (/force majeure|plant shutdown|monthly (?:sales|business)|(?:total|provisional|wholesale|retail) sales|sales (?:volume|update|figures|for the month)|dispatches|production (?:volume|update)|operational update|business update/.test(t)) return "Operational Update";
+  return "";
+}
+
 // Compress a non-results filing into a short Title-ish heading (no full stop,
 // no lead boilerplate) so cards read as headings, not sentences.
 function shortHeading(raw: string): string {
-  let s = (raw ?? "")
-    .replace(/^.*?informed the exchange\s*(?:about|regarding|that|of|:)?\s*/i, "")
-    .replace(/\s+/g, " ")
-    .trim();
-  // If the filing quotes the actual title ("…, titled 'X'"), prefer that.
-  const titled = /(?:titled|entitled)\s*[:'"“”]?\s*(.+)$/i.exec(s);
-  if (titled) s = titled[1];
+  let s = decodeEntities(raw ?? "").replace(/\s+/g, " ").trim();
+  // Prefer the document's own title when the filing quotes it — first the fully
+  // quoted form ("… titled 'X'"), then an unclosed/trailing "titled X".
+  const quoted = /(?:titled|entitled)\s*[:\-]?\s*['"“”‘’]([^'"“”‘’]{4,}?)['"“”‘’]/i.exec(s);
+  const tailing = /(?:titled|entitled)\s*[:'"“”‘’]?\s*(.+)$/i.exec(s);
+  if (quoted) s = quoted[1];
+  else if (tailing) s = tailing[1];
+  else s = s.replace(/^.*?informed the exchange\s*(?:about|regarding|that|of|:)?\s*/i, "");
   s = s
+    .replace(/\((?:formerly|erstwhile)[^)]*\)/gi, "") // drop "(formerly … Limited)"
     .replace(/^['"“”‘’\s]+/, "")
     .replace(/^(?:sub|subject|re|ref)\s*[:\-]\s*/i, "")
+    .replace(/^(?:copy of\s+)?(?:the\s+)?(?:newspaper\s+)?(?:advertisement|publication|intimation|disclosure)\s+(?:dated|for|of)?\s*/i, "")
+    .replace(/^dated\s+[a-z0-9 ,.\-]*?\d{4}[,:\-\s]*/i, "") // "Dated June 15, 2026,"
     .replace(
       /^(?:please find (?:attached|enclosed)(?:\s+(?:herewith|a copy of))?|kindly find|we (?:wish|would like) to inform(?:\s+you)?|this is to inform|we hereby inform|pursuant to|with reference to|in reference to)\s*(?:that|of|about|the|:|,|-|—)?\s*/i,
       "",
@@ -465,13 +510,17 @@ function shortHeading(raw: string): string {
   if (words.length > 9) s = words.slice(0, 9).join(" ") + "…";
   s = s.trim();
   if (s.length < 3 || !/[a-z]/i.test(s)) return ""; // reject junk / punctuation-only
+  // Reject leftovers that still read as truncated boilerplate, not a title
+  // (source text cut off right after "titled", stray "Dated …", etc.).
+  const low = s.toLowerCase();
+  if (/^(?:dated|sub|ref|re|copy of)\b/.test(low) || /\btitled…?$/.test(low) || /informed the exchange|please find|kindly find/.test(low)) return "";
   return s.charAt(0).toUpperCase() + s.slice(1);
 }
 
 // Turn a terse/sentence filing text into a proper, short heading — never a full
 // sentence — consistently across every company, event and tab.
 function friendlyTitle(cat: FilingCategory, rawText: string, desc: string): string {
-  const raw = rawText || desc || "";
+  const raw = decodeEntities(rawText || desc || "");
   const t = raw.toLowerCase();
   const period = resultsPeriod(raw);
   const isResults =
@@ -479,16 +528,17 @@ function friendlyTitle(cat: FilingCategory, rawText: string, desc: string): stri
 
   if (cat === "PRESENTATION") return period ? `${period} Results Presentation` : "Investor Presentation";
   if (cat === "CONCALL") return period ? `Earnings Call · ${period}` : "Earnings Call";
-  if (cat === "SCHEME") return shortHeading(rawText || desc) || "Corporate Action";
+  if (cat === "SCHEME") return shortHeading(raw) || "Corporate Action";
   if (cat === "MEET") {
     if (/transcript/.test(t)) return period ? `Earnings Call Transcript · ${period}` : "Earnings Call — Transcript";
     if (/recording|audio|\brec\b/.test(t)) return period ? `Earnings Call Audio · ${period}` : "Earnings Call — Audio";
     if (/presentation|\bppt\b/.test(t)) return period ? `${period} Results Presentation` : "Investor Presentation";
     return "Analyst / Investor Meeting";
   }
-  // PRESS (and any default)
+  // PRESS (and any default): results → period heading; else a topic heading; else
+  // a cleaned short heading. Never the raw sentence, never a raw HTML entity.
   if (isResults) return period ? `${period} Financial Results` : "Financial Results";
-  return shortHeading(rawText || desc) || "Press Release";
+  return pressTopic(raw) || shortHeading(raw) || "Press Release";
 }
 
 function parseCompanyFilings(data: unknown): CompanyFiling[] {

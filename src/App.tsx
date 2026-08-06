@@ -16,7 +16,7 @@ import { WidgetCard } from "./components/WidgetCard";
 import { EmptyState, ErrorState, ShimmerRows } from "./components/states";
 import { DensityCard } from "./components/DensityCard";
 import { EventModal } from "./components/EventModal";
-import { WhatsNew } from "./components/WhatsNew";
+import { ComingUp } from "./components/ComingUp";
 import { useTheme } from "./hooks/useTheme";
 import { useWatchlist } from "./hooks/useWatchlist";
 import { useEventDiff } from "./hooks/useEventDiff";
@@ -196,7 +196,6 @@ export default function App() {
   const watchlist = useWatchlist();
   const [selected, setSelected] = useState<CorporateEvent | null>(null);
   const [focusDay, setFocusDay] = useState<string | null>(null);
-  const [onlyNew, setOnlyNew] = useState(false);
   const [newsDismissed, setNewsDismissed] = useState(false);
 
   const selectEvent = (e: CorporateEvent) => {
@@ -219,6 +218,20 @@ export default function App() {
       sector: "",
       isProfile: true,
     });
+  };
+
+  // Open a company by ticker: prefer its soonest real upcoming event (so the
+  // details modal shows full event details), falling back to a read-only profile
+  // when the company has nothing scheduled in the current feed.
+  const openTicker = (company: string, ticker: string, exchange: CompanyMatch["exchange"]) => {
+    const up = (ticker || "").toUpperCase();
+    const today = new Date().toISOString().slice(0, 10);
+    const matches = (result?.events ?? [])
+      .filter((e) => e.ticker.toUpperCase() === up)
+      .sort((a, b) => a.date.localeCompare(b.date));
+    const upcoming = matches.find((e) => e.date >= today) ?? matches[0];
+    if (upcoming) setSelected(upcoming);
+    else openProfile({ name: company, symbol: ticker, exchange });
   };
 
   // Reset to the clean landing view: close any open company profile, drop the
@@ -252,22 +265,29 @@ export default function App() {
   }, [companyMatches, filtered]);
 
   const diffs = useEventDiff(result?.events ?? []);
-  let newCount = 0;
-  let revCount = 0;
-  diffs.forEach((d) => (d.isNew ? newCount++ : d.isRevised ? revCount++ : null));
+  const openConcall = (c: ConcallItem) => openTicker(c.company, c.ticker, c.exchange);
 
-  // New / rescheduled within the current view — drives the "What's new" banner
-  // and its "show new only" toggle.
-  const newInView = useMemo(() => filtered.filter((e) => diffs.get(e.id)?.isNew), [filtered, diffs]);
-  const revInViewCount = useMemo(() => filtered.filter((e) => diffs.get(e.id)?.isRevised).length, [filtered, diffs]);
-  const agendaEvents = onlyNew ? newInView : filtered;
-  const openConcall = (c: ConcallItem) => openProfile({ name: c.company, symbol: c.ticker, exchange: c.exchange });
+  // "Coming up" reminders: the soonest upcoming events (today onward), watchlist
+  // first, then chronological — so the most imminent, most relevant events lead.
+  const reminderEvents = useMemo(() => {
+    const today = new Date().toISOString().slice(0, 10);
+    return [...baseFiltered]
+      .filter((e) => e.date >= today)
+      .sort((a, b) => {
+        const wa = watchlist.has(a.ticker) ? 0 : 1;
+        const wb = watchlist.has(b.ticker) ? 0 : 1;
+        if (wa !== wb) return wa - wb;
+        if (a.date !== b.date) return a.date.localeCompare(b.date);
+        return a.company.localeCompare(b.company);
+      })
+      .slice(0, 12);
+  }, [baseFiltered, watchlist]);
+  const watchlistedUpcoming = useMemo(() => baseFiltered.filter((e) => watchlist.has(e.ticker)).length, [baseFiltered, watchlist]);
 
-  // Re-show the banner (and clear the new-only filter) whenever fresh data loads.
+  // Re-show the banner whenever fresh data loads.
   const generatedAt = result?.generatedAt;
   useEffect(() => {
     setNewsDismissed(false);
-    setOnlyNew(false);
   }, [generatedAt]);
 
   const typeCounts = useMemo(() => {
@@ -311,11 +331,7 @@ export default function App() {
     ? new Date(result.generatedAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })
     : "";
   const listTitle = view === "month" ? "Calendar" : view === "table" ? "All events" : "Upcoming events";
-  const listSubtitle = result
-    ? `${filtered.length} events · next ${filters.horizonDays} days${
-        newCount || revCount ? ` · ${newCount} new, ${revCount} rescheduled` : ""
-      }`
-    : "Loading events…";
+  const listSubtitle = result ? `${filtered.length} events · next ${filters.horizonDays} days` : "Loading events…";
 
   return (
     <div style={shell}>
@@ -438,14 +454,16 @@ export default function App() {
           <KpiShimmer />
         )}
 
-        {result && !newsDismissed && (
-          <WhatsNew
-            newCount={newInView.length}
-            revCount={revInViewCount}
+        {result && !newsDismissed && !isSearching && (
+          <ComingUp
+            events={reminderEvents}
+            totalUpcoming={baseFiltered.length}
+            horizonDays={filters.horizonDays}
+            watchlistedCount={watchlistedUpcoming}
             concalls={result.concalls}
-            onlyNew={onlyNew}
-            onToggleNew={() => setOnlyNew((v) => !v)}
-            onOpenCompany={openConcall}
+            isStarred={watchlist.has}
+            onOpenEvent={selectEvent}
+            onOpenConcall={openConcall}
             onDismiss={() => setNewsDismissed(true)}
           />
         )}
@@ -502,7 +520,7 @@ export default function App() {
                       )
                     ) : (
                       <AgendaView
-                        events={agendaEvents}
+                        events={filtered}
                         diffs={diffs}
                         selectedId={selected?.id}
                         isDark={isDark}
