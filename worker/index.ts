@@ -593,7 +593,7 @@ function parseCompanyFilings(data: unknown): CompanyFiling[] {
     out.push({ category: cat, title: friendlyTitle(cat, r.attchmntText ?? "", r.desc ?? ""), date, url, source: hostSource(url) });
   }
   out.sort((a, b) => b.date.localeCompare(a.date));
-  return out.slice(0, 40);
+  return out.slice(0, 90);
 }
 
 // NSE announcements for one symbol → categorised filings. NSE intermittently
@@ -601,7 +601,9 @@ function parseCompanyFilings(data: unknown): CompanyFiling[] {
 async function fetchNseFilings(sym: string): Promise<{ filings: CompanyFiling[]; reached: boolean }> {
   const now = new Date();
   const from = new Date(now);
-  from.setDate(from.getDate() - 150);
+  // ~15 months back so the details tabs carry several past quarters of press
+  // releases, investor meets and presentations, not just the latest one or two.
+  from.setDate(from.getDate() - 460);
   const path = `/api/corporate-announcements?index=equities&symbol=${encodeURIComponent(sym)}&from_date=${nseDate(
     from,
   )}&to_date=${nseDate(now)}`;

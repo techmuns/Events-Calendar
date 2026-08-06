@@ -35,6 +35,36 @@ function monthYear(iso: string): string {
   const d = parseISO(iso);
   return `${MONTHS[d.getMonth()]} ${d.getFullYear()}`;
 }
+// The Indian fiscal quarter a filing falls in (by its own date), for grouping a
+// tab's documents into "Q1 FY27 · Q4 FY26 · …" sections of past quarters.
+function fiscalQuarter(iso: string): string {
+  const [y, m] = iso.split("-").map(Number);
+  if (!y || !m) return "Earlier";
+  let q: number;
+  let fy: number;
+  if (m >= 4 && m <= 6) {
+    q = 1;
+    fy = y + 1;
+  } else if (m >= 7 && m <= 9) {
+    q = 2;
+    fy = y + 1;
+  } else if (m >= 10 && m <= 12) {
+    q = 3;
+    fy = y + 1;
+  } else {
+    q = 4;
+    fy = y;
+  }
+  return `Q${q} FY${String(fy % 100).padStart(2, "0")}`;
+}
+function groupByQuarter(filings: CompanyFiling[]): [string, CompanyFiling[]][] {
+  const map = new Map<string, CompanyFiling[]>();
+  for (const f of filings) {
+    const k = fiscalQuarter(f.date);
+    (map.get(k) ?? map.set(k, []).get(k)!).push(f);
+  }
+  return [...map.entries()]; // filings are newest-first, so quarters come newest-first
+}
 
 const CAT_ORDER: FilingCategory[] = ["PRESS", "MEET", "PRESENTATION", "CONCALL", "SCHEME"];
 const TAB_LABEL: Record<FilingCategory, string> = {
@@ -731,10 +761,33 @@ export function EventDetail({
         ) : tab === "CONCALL" ? (
           <ConcallHistory concalls={byCat.CONCALL} accent={accent} />
         ) : (
-          <div style={{ display: "flex", flexDirection: "column", gap: 9 }}>
-            {byCat[tab].map((f, i) =>
-              f.links && f.links.length ? <ConcallCard key={i} f={f} accent={accent} /> : <DocumentCard key={i} f={f} accent={accent} />,
-            )}
+          <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+            {groupByQuarter(byCat[tab]).map(([q, items]) => (
+              <div key={q}>
+                <div
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 8,
+                    marginBottom: 8,
+                    fontSize: 10.5,
+                    fontWeight: 700,
+                    textTransform: "uppercase",
+                    letterSpacing: "0.05em",
+                    color: tokens.textHint,
+                  }}
+                >
+                  <span>{q}</span>
+                  <span style={{ flex: 1, height: 1, background: tokens.border }} />
+                  <span style={{ fontWeight: 600 }}>{items.length}</span>
+                </div>
+                <div style={{ display: "flex", flexDirection: "column", gap: 9 }}>
+                  {items.map((f, i) =>
+                    f.links && f.links.length ? <ConcallCard key={i} f={f} accent={accent} /> : <DocumentCard key={i} f={f} accent={accent} />,
+                  )}
+                </div>
+              </div>
+            ))}
             {(() => {
               const viewAllUrl = event.sourceUrl ?? byCat[tab].find((f) => f.url)?.url;
               return viewAllUrl ? (
