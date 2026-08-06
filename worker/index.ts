@@ -380,6 +380,43 @@ function parseNseConcalls(data: unknown): ConcallItem[] {
   return out.slice(0, 40);
 }
 
+// Just-reported results pulled from the last few days of NSE announcements, so a
+// company that reported today/yesterday still appears (as "Recent") even though
+// the forthcoming-results feed has already dropped it.
+function parseNseRecentResults(data: unknown): CorporateEvent[] {
+  if (!Array.isArray(data)) return [];
+  const out: CorporateEvent[] = [];
+  const seen = new Set<string>();
+  for (const r of data as Array<Record<string, string>>) {
+    const desc = (r.desc ?? "").toLowerCase();
+    const text = (r.attchmntText ?? "").toLowerCase();
+    const blob = `${desc} ${text}`;
+    // Genuine quarterly/annual results outcomes only (not dividends, ratings…).
+    const isResults =
+      /financial results?|quarterly results?|(?:un)?audited (?:standalone|consolidated|financial)/.test(blob) ||
+      (/outcome of (?:the )?board meeting/.test(desc) && /\bresults?\b/.test(blob));
+    if (!isResults) continue;
+    const date = anyDate(r.an_dt) ?? anyDate(r.sort_date ?? "");
+    const ticker = (r.symbol ?? "").trim();
+    if (!date || !ticker || seen.has(ticker)) continue;
+    seen.add(ticker);
+    out.push({
+      id: `NSE_RES_${r.seq_id || ticker + date}`,
+      company: titleCase(r.sm_name ?? ticker),
+      ticker,
+      eventType: "EARNINGS",
+      subtype: "Results",
+      date,
+      status: "CONFIRMED",
+      exchange: "NSE",
+      sourceUrl: r.attchmntFile || undefined,
+      indices: [],
+      sector: "",
+    });
+  }
+  return out.slice(0, 60);
+}
+
 // ---- Per-company filings (Details tab) --------------------------------------
 // NSE announcements carry a category (`desc`) and a body (`attchmntText`); we
 // sort each into the buckets the desk cares about and keep the direct PDF link.
@@ -759,18 +796,23 @@ async function buildLiveResult() {
   const now = new Date();
   const from = new Date(now);
   from.setDate(from.getDate() - 4);
+  // Keep a few days of just-reported events so a same-day/2-3-day-old result is
+  // still surfaced (as "Recent") rather than vanishing the moment it happens.
+  const recentFrom = new Date(now);
+  recentFrom.setDate(recentFrom.getDate() - 4);
+  const recentCutoff = recentFrom.toISOString().slice(0, 10);
   // NSE board-meetings returns only a tiny default window without dates, so ask
   // for the whole upcoming horizon — this is what surfaces NSE-only companies.
   const bmTo = new Date(now);
   bmTo.setDate(bmTo.getDate() + 120);
 
-  const [constituents, settled, concalls] = await Promise.all([
+  const [constituents, settled, annRaw] = await Promise.all([
     fetchConstituents().catch(() => new Map<string, Constituent>()),
     Promise.allSettled([
       retry(() => bseJson("/Corpforthresults/w")).then(parseBseForthResults),
       retry(() =>
         nseJson(
-          `/api/corporate-board-meetings?index=equities&from_date=${nseDate(now)}&to_date=${nseDate(bmTo)}`,
+          `/api/corporate-board-meetings?index=equities&from_date=${nseDate(recentFrom)}&to_date=${nseDate(bmTo)}`,
           `${NSE}/companies-listing/corporate-filings-board-meetings`,
           cookie,
         ),
@@ -787,10 +829,12 @@ async function buildLiveResult() {
       `/api/corporate-announcements?index=equities&from_date=${nseDate(from)}&to_date=${nseDate(now)}`,
       `${NSE}/companies-listing/corporate-filings-announcements`,
       cookie,
-    )
-      .then(parseNseConcalls)
-      .catch(() => [] as ConcallItem[]),
+    ).catch(() => null),
   ]);
+
+  // The announcements feed drives both the concall list and just-reported results.
+  const concalls = annRaw ? parseNseConcalls(annRaw) : [];
+  const recentResults = annRaw ? parseNseRecentResults(annRaw) : [];
 
   const sources = { bse: false, nse: false };
   const all: CorporateEvent[] = [];
@@ -801,12 +845,12 @@ async function buildLiveResult() {
       if (i > 0 && r.value.length) sources.nse = true;
     }
   });
-  if (concalls.length) sources.nse = true;
+  all.push(...recentResults);
+  if (concalls.length || recentResults.length) sources.nse = true;
 
   const enriched = all.map((e) => enrichEvent(e, constituents));
-  const today = todayISO();
   const events = dedupe(enriched)
-    .filter((e) => e.date >= today)
+    .filter((e) => e.date >= recentCutoff)
     .sort((a, b) => a.date.localeCompare(b.date) || a.company.localeCompare(b.company));
 
   const label = [sources.bse && "BSE", sources.nse && "NSE"].filter(Boolean).join(" + ");

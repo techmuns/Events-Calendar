@@ -33,7 +33,7 @@ function filingLink(f?: CompanyFiling): string | undefined {
 }
 
 const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
-const BUCKET_ORDER: Bucket[] = ["Today", "Tomorrow", "This week", "Next week", "Later"];
+const BUCKET_ORDER: Bucket[] = ["Recent", "Today", "Tomorrow", "This week", "Next week", "Later"];
 
 interface RowHandlers {
   onSelect: (e: CorporateEvent) => void;
@@ -154,7 +154,8 @@ function EventRow({
   selected,
   isDark,
   isToday,
-}: { e: CorporateEvent; diff?: EventDiff; selected: boolean; isDark: boolean; isToday: boolean } & RowHandlers) {
+  isRecent,
+}: { e: CorporateEvent; diff?: EventDiff; selected: boolean; isDark: boolean; isToday: boolean; isRecent: boolean } & RowHandlers) {
   const [expanded, setExpanded] = useState(false);
   const [hovered, setHovered] = useState(false);
   const starred = isStarred(e.ticker);
@@ -260,6 +261,22 @@ function EventRow({
               }}
             >
               TODAY
+            </span>
+          )}
+          {isRecent && (
+            <span
+              style={{
+                fontSize: 9.5,
+                fontWeight: 800,
+                letterSpacing: "0.04em",
+                color: tokens.textMuted,
+                background: tokens.surface2,
+                border: `1px solid ${tokens.border}`,
+                borderRadius: 6,
+                padding: "1px 6px",
+              }}
+            >
+              REPORTED
             </span>
           )}
           {diff?.isRevised && <ChangeBadge kind="moved" />}
@@ -381,7 +398,7 @@ export function AgendaView({
     return <EmptyState message="No events match these filters" hint="Try widening the horizon or switching the universe to All." />;
   }
   const today = todayStart();
-  const groups: Record<Bucket, CorporateEvent[]> = { Today: [], Tomorrow: [], "This week": [], "Next week": [], Later: [] };
+  const groups: Record<Bucket, CorporateEvent[]> = { Recent: [], Today: [], Tomorrow: [], "This week": [], "Next week": [], Later: [] };
   for (const e of events) groups[bucketFor(e.date, today)].push(e);
 
   return (
@@ -400,15 +417,15 @@ export function AgendaView({
               fontWeight: 700,
               textTransform: "uppercase",
               letterSpacing: "0.06em",
-              color: tokens.primaryText,
+              color: b === "Recent" ? tokens.textMuted : tokens.primaryText,
               borderBottom: `1px solid ${tokens.border}`,
             }}
           >
-            {b}
+            {b === "Recent" ? "Recently reported" : b}
             <span style={{ color: tokens.textHint, fontWeight: 600 }}> · {groups[b].length}</span>
           </div>
           {groups[b].map((e) => (
-            <EventRow key={e.id} e={e} diff={diffs?.get(e.id)} selected={selectedId === e.id} isDark={isDark} isToday={b === "Today"} {...handlers} />
+            <EventRow key={e.id} e={e} diff={diffs?.get(e.id)} selected={selectedId === e.id} isDark={isDark} isToday={b === "Today"} isRecent={b === "Recent"} {...handlers} />
           ))}
         </div>
       ))}

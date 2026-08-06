@@ -5,7 +5,7 @@ import { companyAccent, tokens } from "./theme";
 import { useEvents } from "./hooks/useEvents";
 import { useHostContext } from "./hooks/useHostContext";
 import { useCompanySearch } from "./hooks/useCompanySearch";
-import { applyFilters } from "./lib/filter";
+import { applyFilters, applyRecent } from "./lib/filter";
 import { formatDate, parseISO } from "./lib/dates";
 
 const RANGE_MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
@@ -260,6 +260,10 @@ export default function App() {
 
   const baseFiltered = result ? applyFilters(result.events, filters, watchlist.set) : [];
   const filtered = focusDay ? baseFiltered.filter((e) => e.date === focusDay) : baseFiltered;
+  // Just-reported events shown above the upcoming list (not when drilled into a
+  // single day). KPIs, density and reminders stay forward-looking via baseFiltered.
+  const recentEvents = useMemo(() => (result ? applyRecent(result.events, filters, watchlist.set) : []), [result, filters, watchlist]);
+  const agendaEvents = focusDay ? filtered : [...recentEvents, ...filtered];
 
   // Company search: surface listed firms that have no upcoming event (so they're
   // absent from the list) — e.g. CDSL, or a company that already reported.
@@ -513,7 +517,7 @@ export default function App() {
                 <>
                   {isSearching && <CompanyProfileResults matches={searchProfiles} loading={searchLoading} onOpen={openProfile} />}
                   {view === "agenda" ? (
-                    filtered.length === 0 && isSearching ? (
+                    agendaEvents.length === 0 && isSearching ? (
                       searchProfiles.length > 0 ? null : (
                         <EmptyState
                           message={searchLoading ? "Searching companies…" : `No results for “${filters.search.trim()}”`}
@@ -522,7 +526,7 @@ export default function App() {
                       )
                     ) : (
                       <AgendaView
-                        events={filtered}
+                        events={agendaEvents}
                         diffs={diffs}
                         selectedId={selected?.id}
                         isDark={isDark}

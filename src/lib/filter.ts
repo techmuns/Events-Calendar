@@ -42,3 +42,21 @@ export function applyFilters(
     )
     .sort((a, b) => a.date.localeCompare(b.date) || a.company.localeCompare(b.company));
 }
+
+// Just-reported events (the last few days, before today) matching the active
+// filters — surfaced as "Recent" so a same-day/2-3-day-old event isn't dropped.
+// Empty in custom-range mode, where the range already defines the window.
+export function applyRecent(events: CorporateEvent[], f: Filters, watchlist: Set<string>): CorporateEvent[] {
+  if (f.customStart && f.customEnd) return [];
+  const today = todayStart();
+  const q = f.search.trim().toLowerCase();
+  return events
+    .filter((e) => f.types.includes(e.eventType))
+    .filter((e) => diffDays(today, parseISO(e.date)) < 0)
+    .filter((e) => matchUniverse(e, f.universe, watchlist))
+    .filter(
+      (e) => !q || e.company.toLowerCase().includes(q) || e.ticker.toLowerCase().includes(q) || e.sector.toLowerCase().includes(q),
+    )
+    .sort((a, b) => b.date.localeCompare(a.date) || a.company.localeCompare(b.company))
+    .slice(0, 12);
+}
