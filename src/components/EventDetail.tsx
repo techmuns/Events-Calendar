@@ -4,6 +4,7 @@ import type { CompanyFiling, CorporateEvent, FilingCategory, FilingSource } from
 import { companyAccent, eventTypeMeta, filingCategoryMeta, tokens } from "../theme";
 import {
   CalendarIcon,
+  ClockIcon,
   DownloadIcon,
   ExternalLinkIcon,
   FileTextIcon,
@@ -16,6 +17,7 @@ import {
 } from "./icons";
 import { parseISO } from "../lib/dates";
 import { downloadEventPdf } from "../lib/pdf";
+import { callMonthToQuarter, lastNQuarters, quarterRank, type Quarter } from "../lib/quarters";
 import { useCompanyFilings } from "../hooks/useCompanyFilings";
 
 const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
@@ -28,6 +30,10 @@ function longDate(iso: string): string {
 function shortDate(iso: string): string {
   const d = parseISO(iso);
   return `${d.getDate()} ${MONTHS[d.getMonth()]} ${d.getFullYear()}`;
+}
+function monthYear(iso: string): string {
+  const d = parseISO(iso);
+  return `${MONTHS[d.getMonth()]} ${d.getFullYear()}`;
 }
 
 const CAT_ORDER: FilingCategory[] = ["PRESS", "MEET", "PRESENTATION", "CONCALL", "SCHEME"];
@@ -182,7 +188,7 @@ function DocumentCard({ f, accent }: { f: CompanyFiling; accent: string }) {
   );
 }
 
-function ConcallCard({ f, accent }: { f: CompanyFiling; accent: string }) {
+function ConcallCard({ f, accent, q }: { f: CompanyFiling; accent: string; q?: Quarter }) {
   return (
     <div
       className="card-hover"
@@ -213,8 +219,11 @@ function ConcallCard({ f, accent }: { f: CompanyFiling; accent: string }) {
           <MicIcon size={18} />
         </span>
         <div style={{ flex: 1, minWidth: 0 }}>
-          <div style={{ fontSize: 13, fontWeight: 700, color: tokens.textPrimary }}>{f.title}</div>
-          <div style={{ marginTop: 3 }}>
+          <div style={{ fontSize: 13.5, fontWeight: 700, color: tokens.textPrimary, letterSpacing: "-0.01em" }}>
+            {q ? `${q.label} Earnings Call` : f.title}
+          </div>
+          <div style={{ display: "flex", alignItems: "center", gap: 7, marginTop: 3 }}>
+            {q && <span style={{ fontSize: 11.5, color: tokens.textHint }}>Held {monthYear(f.date)}</span>}
             <SourceBadge source={f.source} />
           </div>
         </div>
@@ -232,6 +241,89 @@ function ConcallCard({ f, accent }: { f: CompanyFiling; accent: string }) {
           </div>
         );
       })()}
+    </div>
+  );
+}
+
+// A quarter with no earnings call on record — rendered as a muted, dashed row so
+// the history reads as a continuous quarter-by-quarter timeline with visible
+// gaps. `awaited` distinguishes the current quarter (call not yet held) from an
+// older quarter the company genuinely skipped.
+function ConcallMissing({ q, awaited }: { q: Quarter; awaited?: boolean }) {
+  const tint = awaited ? "#b45309" : tokens.textHint;
+  return (
+    <div
+      style={{
+        display: "flex",
+        alignItems: "center",
+        gap: 11,
+        border: `1px dashed ${awaited ? "#fcd34d" : tokens.border}`,
+        borderRadius: 13,
+        padding: "11px 12px",
+        background: awaited ? "color-mix(in srgb, #f59e0b 6%, transparent)" : "transparent",
+      }}
+    >
+      <span
+        style={{
+          flexShrink: 0,
+          width: 38,
+          height: 38,
+          borderRadius: 10,
+          display: "inline-flex",
+          alignItems: "center",
+          justifyContent: "center",
+          color: tint,
+          background: awaited ? "color-mix(in srgb, #f59e0b 12%, transparent)" : tokens.moduleBg,
+          border: `1px solid ${awaited ? "#fcd34d" : tokens.border}`,
+          opacity: awaited ? 1 : 0.9,
+        }}
+      >
+        {awaited ? <ClockIcon size={18} /> : <MicIcon size={18} />}
+      </span>
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <div style={{ fontSize: 13, fontWeight: 700, color: tokens.textMuted }}>{q.label} Earnings Call</div>
+        <div style={{ fontSize: 11.5, color: awaited ? "#b45309" : tokens.textHint, marginTop: 2, fontWeight: awaited ? 600 : 400 }}>
+          {awaited ? "Awaited — call not yet held" : "Concall not available"}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// Map a concall filing (dated by the month the call was held) to the results
+// quarter it covers.
+function quarterOf(f: CompanyFiling): Quarter | null {
+  const [y, m] = f.date.split("-").map(Number);
+  if (!y || !m) return null;
+  return callMonthToQuarter(y, m);
+}
+
+// Quarter-by-quarter earnings-call history: the last eight fiscal quarters,
+// newest first, each either the real call (transcript / audio) or a
+// "Concall not available" placeholder so skipped quarters are explicit.
+function ConcallHistory({ concalls, accent }: { concalls: CompanyFiling[]; accent: string }) {
+  const now = new Date();
+  const byQuarter = new Map<string, CompanyFiling>();
+  // Anchor the timeline to the newest of {this quarter, latest call on record}
+  // so a company that hasn't reported the current quarter still shows the gap.
+  const currentQ = callMonthToQuarter(now.getFullYear(), now.getMonth() + 1);
+  let top = currentQ;
+  for (const f of concalls) {
+    const q = quarterOf(f);
+    if (!q) continue;
+    if (!byQuarter.has(q.key)) byQuarter.set(q.key, f);
+    if (quarterRank(q) > quarterRank(top)) top = q;
+  }
+  const grid = lastNQuarters(top.endY, top.endM, 8);
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 9 }}>
+      {grid.map((q) => {
+        const f = byQuarter.get(q.key);
+        if (f) return <ConcallCard key={q.key} f={f} q={q} accent={accent} />;
+        // A gap at the current/most-recent quarter is a call that's due but not
+        // yet held, not one the company skipped.
+        return <ConcallMissing key={q.key} q={q} awaited={quarterRank(q) >= quarterRank(currentQ)} />;
+      })}
     </div>
   );
 }
@@ -636,6 +728,8 @@ export function EventDetail({
           </div>
         ) : byCat[tab].length === 0 ? (
           <EmptyTab label={TAB_LABEL[tab]} />
+        ) : tab === "CONCALL" ? (
+          <ConcallHistory concalls={byCat.CONCALL} accent={accent} />
         ) : (
           <div style={{ display: "flex", flexDirection: "column", gap: 9 }}>
             {byCat[tab].map((f, i) =>
