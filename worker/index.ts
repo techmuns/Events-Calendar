@@ -231,7 +231,12 @@ function parseBoardMeetings(data: unknown): CorporateEvent[] {
       date,
       status: "CONFIRMED",
       exchange: "NSE",
-      sourceUrl: r.attachment || `${NSE}/companies-listing/corporate-filings-board-meetings`,
+      // Link to the company's readable NSE page — never the raw XBRL/XML the
+      // board-meeting intimation ships as (an unstyled document tree otherwise).
+      sourceUrl:
+        r.attachment && /\.pdf($|\?)/i.test(r.attachment)
+          ? r.attachment
+          : `${NSE}/get-quotes/equity?symbol=${encodeURIComponent(ticker)}`,
       indices: indicesFor(ticker),
       sector: "",
     });

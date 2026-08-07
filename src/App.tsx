@@ -1,18 +1,56 @@
 import { useMemo, useState } from "react";
 import type { CSSProperties, ReactNode } from "react";
-import type { CompanyMatch, ConcallItem, CorporateEvent, EventType, Filters } from "./types";
+import type { CompanyMatch, CorporateEvent, EventType, FilingCategory, Filters } from "./types";
 import { companyAccent, tokens } from "./theme";
 import { useEvents } from "./hooks/useEvents";
 import { useHostContext } from "./hooks/useHostContext";
 import { useCompanySearch } from "./hooks/useCompanySearch";
 import { applyFilters, applyRecent } from "./lib/filter";
-import { formatDate, parseISO } from "./lib/dates";
+import { bucketFor, formatDate, parseISO, todayStart, type Bucket } from "./lib/dates";
 
 const RANGE_MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
 function fmtRange(iso: string): string {
   const [y, m, d] = iso.split("-").map(Number);
   if (!y || !m) return iso;
   return `${d} ${RANGE_MONTHS[m - 1]}`;
+}
+
+// Quick time filters shown beside the "Upcoming events" title.
+const AGENDA_QUICK: { key: Bucket | null; label: string }[] = [
+  { key: null, label: "All" },
+  { key: "Today", label: "Today" },
+  { key: "Tomorrow", label: "Tomorrow" },
+  { key: "This week", label: "This week" },
+  { key: "Next week", label: "Next week" },
+];
+function BucketChips({ value, onChange }: { value: Bucket | null; onChange: (b: Bucket | null) => void }) {
+  return (
+    <div style={{ display: "flex", gap: 5, flexWrap: "wrap" }}>
+      {AGENDA_QUICK.map((b) => {
+        const active = value === b.key;
+        return (
+          <button
+            key={b.label}
+            onClick={() => onChange(b.key)}
+            style={{
+              cursor: "pointer",
+              fontSize: 11.5,
+              fontWeight: 600,
+              padding: "4px 11px",
+              borderRadius: 99,
+              whiteSpace: "nowrap",
+              border: `1px solid ${active ? tokens.primary : tokens.border}`,
+              background: active ? tokens.primary : tokens.surface,
+              color: active ? "#fff" : tokens.textSecondary,
+              transition: "all 0.15s",
+            }}
+          >
+            {b.label}
+          </button>
+        );
+      })}
+    </div>
+  );
 }
 import { FiltersBar } from "./components/FiltersBar";
 import { KpiRow } from "./components/KpiRow";
@@ -203,9 +241,13 @@ export default function App() {
   const watchlist = useWatchlist();
   const [selected, setSelected] = useState<CorporateEvent | null>(null);
   const [focusDay, setFocusDay] = useState<string | null>(null);
+  const [agendaBucket, setAgendaBucket] = useState<Bucket | null>(null);
+  const [pendingTab, setPendingTab] = useState<FilingCategory | null>(null);
 
-  const selectEvent = (e: CorporateEvent) => {
+  // Open a company's modal, optionally jumping straight to a materials tab.
+  const selectEvent = (e: CorporateEvent, tab?: FilingCategory) => {
     setSelected(e);
+    setPendingTab(tab ?? null);
   };
 
   // Open a searched company that has no upcoming event as a read-only profile
@@ -224,20 +266,6 @@ export default function App() {
       sector: "",
       isProfile: true,
     });
-  };
-
-  // Open a company by ticker: prefer its soonest real upcoming event (so the
-  // details modal shows full event details), falling back to a read-only profile
-  // when the company has nothing scheduled in the current feed.
-  const openTicker = (company: string, ticker: string, exchange: CompanyMatch["exchange"]) => {
-    const up = (ticker || "").toUpperCase();
-    const today = new Date().toISOString().slice(0, 10);
-    const matches = (result?.events ?? [])
-      .filter((e) => e.ticker.toUpperCase() === up)
-      .sort((a, b) => a.date.localeCompare(b.date));
-    const upcoming = matches.find((e) => e.date >= today) ?? matches[0];
-    if (upcoming) setSelected(upcoming);
-    else openProfile({ name: company, symbol: ticker, exchange });
   };
 
   // Reset to the clean landing view: close any open company profile, drop the
@@ -264,6 +292,12 @@ export default function App() {
   // single day). KPIs, density and reminders stay forward-looking via baseFiltered.
   const recentEvents = useMemo(() => (result ? applyRecent(result.events, filters, watchlist.set) : []), [result, filters, watchlist]);
   const agendaEvents = focusDay ? filtered : [...recentEvents, ...filtered];
+  // Quick time filter (Today / Tomorrow / This week / Next week) beside the list.
+  const displayAgenda = useMemo(() => {
+    if (!agendaBucket) return agendaEvents;
+    const t = todayStart();
+    return agendaEvents.filter((e) => bucketFor(e.date, t) === agendaBucket);
+  }, [agendaEvents, agendaBucket]);
 
   // Company search: surface listed firms that have no upcoming event (so they're
   // absent from the list) — e.g. CDSL, or a company that already reported.
@@ -275,12 +309,10 @@ export default function App() {
   }, [companyMatches, filtered]);
 
   const diffs = useEventDiff(result?.events ?? []);
-  const openConcall = (c: ConcallItem) => openTicker(c.company, c.ticker, c.exchange);
 
-  // "Coming up" reminders: the soonest upcoming events (today onward), watchlist
-  // first, then chronological — so the most imminent, most relevant events lead.
-  // Reminders are scoped to the user's watchlist: this banner is "your companies".
-  // Not horizon-limited — a watchlisted company reporting in 3 weeks still matters.
+  // "Coming up" reminders — the user's watchlist only, so the banner is purely
+  // "your companies". Not horizon-limited: a watchlisted company reporting in 3
+  // weeks still matters.
   const reminderEvents = useMemo(() => {
     const today = new Date().toISOString().slice(0, 10);
     return (result?.events ?? [])
@@ -288,10 +320,6 @@ export default function App() {
       .sort((a, b) => a.date.localeCompare(b.date) || a.company.localeCompare(b.company))
       .slice(0, 12);
   }, [result, watchlist, filters.types]);
-  const watchlistConcalls = useMemo(
-    () => (result?.concalls ?? []).filter((c) => watchlist.has(c.ticker)),
-    [result, watchlist],
-  );
 
   const typeCounts = useMemo(() => {
     const c: Record<EventType, number> = { EARNINGS: 0, CONCALL: 0, DEMERGER: 0 };
@@ -467,10 +495,8 @@ export default function App() {
           <ComingUp
             events={reminderEvents}
             watchlistCount={watchlist.set.size}
-            concalls={watchlistConcalls}
             isStarred={watchlist.has}
             onOpenEvent={selectEvent}
-            onOpenConcall={openConcall}
           />
         )}
 
@@ -506,6 +532,8 @@ export default function App() {
                   >
                     {formatDate(focusDay)} ✕
                   </button>
+                ) : view === "agenda" && !isSearching ? (
+                  <BucketChips value={agendaBucket} onChange={setAgendaBucket} />
                 ) : undefined
               }
             >
@@ -526,7 +554,7 @@ export default function App() {
                       )
                     ) : (
                       <AgendaView
-                        events={agendaEvents}
+                        events={isSearching ? agendaEvents : displayAgenda}
                         diffs={diffs}
                         selectedId={selected?.id}
                         isDark={isDark}
@@ -555,6 +583,7 @@ export default function App() {
           isStarred={watchlist.has}
           onToggleStar={watchlist.toggle}
           onClose={() => setSelected(null)}
+          initialTab={pendingTab}
         />
       )}
     </div>

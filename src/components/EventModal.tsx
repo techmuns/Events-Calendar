@@ -1,5 +1,5 @@
 import { useEffect } from "react";
-import type { CorporateEvent } from "../types";
+import type { CorporateEvent, FilingCategory } from "../types";
 import { tokens } from "../theme";
 import { EventDetail } from "./EventDetail";
 import { XIcon } from "./icons";
@@ -14,6 +14,7 @@ export function EventModal({
   isStarred,
   onToggleStar,
   onClose,
+  initialTab,
 }: {
   event: CorporateEvent;
   allEvents: CorporateEvent[];
@@ -21,6 +22,7 @@ export function EventModal({
   isStarred: (ticker: string) => boolean;
   onToggleStar: (ticker: string) => void;
   onClose: () => void;
+  initialTab?: FilingCategory | null;
 }) {
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -96,6 +98,7 @@ export function EventModal({
           onSelect={onSelect}
           isStarred={isStarred}
           onToggleStar={onToggleStar}
+          initialTab={initialTab}
         />
       </div>
     </div>

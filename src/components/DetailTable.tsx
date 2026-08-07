@@ -1,20 +1,24 @@
 import { useMemo, useState } from "react";
 import type { CSSProperties } from "react";
-import type { CorporateEvent } from "../types";
-import { tokens } from "../theme";
-import { EventTypeChip, StatusBadge } from "./badges";
-import { ExternalLinkIcon } from "./icons";
+import type { CorporateEvent, FilingCategory } from "../types";
+import { filingCategoryMeta, tokens } from "../theme";
+import { FileTextIcon, MicIcon, PresentationIcon, UsersIcon } from "./icons";
 import { formatDate } from "../lib/dates";
 import { EmptyState } from "./states";
 
-type SortKey = "date" | "company" | "eventType" | "status" | "exchange";
+type SortKey = "date" | "company";
+type IconCmp = (p: { size?: number }) => JSX.Element;
 
-const COLUMNS: { key: SortKey; label: string }[] = [
+const SORTABLE: { key: SortKey; label: string }[] = [
   { key: "date", label: "Date" },
   { key: "company", label: "Company" },
-  { key: "eventType", label: "Type" },
-  { key: "status", label: "Status" },
-  { key: "exchange", label: "Exch." },
+];
+// The materials columns — one click opens the company on that tab.
+const MATERIALS: { key: FilingCategory; label: string; Icon: IconCmp }[] = [
+  { key: "PRESS", label: "Press Release", Icon: FileTextIcon },
+  { key: "MEET", label: "Investor Meet", Icon: UsersIcon },
+  { key: "PRESENTATION", label: "Presentations", Icon: PresentationIcon },
+  { key: "CONCALL", label: "Concalls", Icon: MicIcon },
 ];
 
 export function DetailTable({
@@ -22,17 +26,13 @@ export function DetailTable({
   onSelect,
 }: {
   events: CorporateEvent[];
-  onSelect: (e: CorporateEvent) => void;
+  onSelect: (e: CorporateEvent, tab?: FilingCategory) => void;
 }) {
   const [sort, setSort] = useState<{ key: SortKey; dir: 1 | -1 }>({ key: "date", dir: 1 });
 
   const sorted = useMemo(() => {
     const copy = [...events];
-    copy.sort((a, b) => {
-      const av = String(a[sort.key]);
-      const bv = String(b[sort.key]);
-      return av.localeCompare(bv) * sort.dir;
-    });
+    copy.sort((a, b) => String(a[sort.key]).localeCompare(String(b[sort.key])) * sort.dir);
     return copy;
   }, [events, sort]);
 
@@ -40,12 +40,12 @@ export function DetailTable({
     return <EmptyState message="Nothing to list" hint="Adjust the filters to see events here." />;
   }
 
-  const toggle = (key: SortKey) =>
-    setSort((s) => (s.key === key ? { key, dir: s.dir === 1 ? -1 : 1 } : { key, dir: 1 }));
+  const toggle = (key: SortKey) => setSort((s) => (s.key === key ? { key, dir: s.dir === 1 ? -1 : 1 } : { key, dir: 1 }));
 
   const th: CSSProperties = {
     position: "sticky",
     top: 0,
+    zIndex: 1,
     background: tokens.cardHeaderBg,
     textAlign: "left",
     fontSize: 11,
@@ -53,13 +53,13 @@ export function DetailTable({
     textTransform: "uppercase",
     letterSpacing: "0.03em",
     color: tokens.textHint,
-    padding: "8px 12px",
+    padding: "9px 14px",
     borderBottom: `1px solid ${tokens.border}`,
-    cursor: "pointer",
     whiteSpace: "nowrap",
   };
+  const thCenter: CSSProperties = { ...th, textAlign: "center", cursor: "default" };
   const td: CSSProperties = {
-    padding: "9px 12px",
+    padding: "10px 14px",
     borderBottom: `1px solid ${tokens.border}`,
     fontSize: 13,
     color: tokens.textSecondary,
@@ -71,47 +71,58 @@ export function DetailTable({
       <table style={{ width: "100%", borderCollapse: "collapse", fontFamily: tokens.font }}>
         <thead>
           <tr>
-            {COLUMNS.map((c) => (
-              <th key={c.key} style={th} onClick={() => toggle(c.key)}>
+            {SORTABLE.map((c) => (
+              <th key={c.key} style={{ ...th, cursor: "pointer" }} onClick={() => toggle(c.key)}>
                 {c.label}
                 {sort.key === c.key ? (sort.dir === 1 ? " ▲" : " ▼") : ""}
               </th>
             ))}
-            <th style={th}>Source</th>
+            {MATERIALS.map((m) => (
+              <th key={m.key} style={thCenter}>
+                {m.label}
+              </th>
+            ))}
           </tr>
         </thead>
         <tbody>
           {sorted.map((e) => (
-            <tr key={e.id} onClick={() => onSelect(e)} style={{ cursor: "pointer" }}>
-              <td style={{ ...td, whiteSpace: "nowrap" }}>{formatDate(e.date)}</td>
+            <tr key={e.id} className="row-hover" onClick={() => onSelect(e)} style={{ cursor: "pointer" }}>
+              <td style={{ ...td, whiteSpace: "nowrap", color: tokens.textMuted }}>{formatDate(e.date)}</td>
               <td style={td}>
-                <div style={{ fontWeight: 600, color: tokens.textPrimary }}>{e.company}</div>
-                <div style={{ fontSize: 11.5, color: tokens.textHint }}>
+                <div style={{ fontWeight: 700, color: tokens.textPrimary }}>{e.company}</div>
+                <div style={{ fontSize: 11.5, color: tokens.textHint, marginTop: 1 }}>
                   {e.ticker} · {e.subtype}
                 </div>
               </td>
-              <td style={td}>
-                <EventTypeChip type={e.eventType} />
-              </td>
-              <td style={td}>
-                <StatusBadge status={e.status} />
-              </td>
-              <td style={{ ...td, color: tokens.textMuted }}>{e.exchange}</td>
-              <td style={td}>
-                {e.sourceUrl ? (
-                  <a
-                    href={e.sourceUrl}
-                    target="_blank"
-                    rel="noreferrer"
-                    onClick={(ev) => ev.stopPropagation()}
-                    style={{ display: "inline-flex", alignItems: "center", gap: 4, color: tokens.primary, textDecoration: "none" }}
-                  >
-                    Filing <ExternalLinkIcon size={12} />
-                  </a>
-                ) : (
-                  "—"
-                )}
-              </td>
+              {MATERIALS.map((m) => {
+                const meta = filingCategoryMeta[m.key];
+                return (
+                  <td key={m.key} style={{ ...td, textAlign: "center" }}>
+                    <button
+                      onClick={(ev) => {
+                        ev.stopPropagation();
+                        onSelect(e, m.key);
+                      }}
+                      title={`Open ${e.company} — ${m.label}`}
+                      className="card-hover"
+                      style={{
+                        cursor: "pointer",
+                        display: "inline-flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        width: 32,
+                        height: 32,
+                        borderRadius: 9,
+                        color: meta.hex,
+                        background: meta.bg,
+                        border: `1px solid ${meta.border}`,
+                      }}
+                    >
+                      <m.Icon size={15} />
+                    </button>
+                  </td>
+                );
+              })}
             </tr>
           ))}
         </tbody>

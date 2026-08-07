@@ -400,16 +400,18 @@ export function EventDetail({
   onSelect,
   isStarred,
   onToggleStar,
+  initialTab,
 }: {
   event: CorporateEvent;
   allEvents: CorporateEvent[];
   onSelect: (e: CorporateEvent) => void;
   isStarred: (ticker: string) => boolean;
   onToggleStar: (ticker: string) => void;
+  initialTab?: FilingCategory | null;
 }) {
   const { filings, source, loading } = useCompanyFilings(event.ticker, event.company);
-  const [tab, setTab] = useState<"overview" | FilingCategory>("overview");
-  useEffect(() => setTab("overview"), [event.id]);
+  const [tab, setTab] = useState<"overview" | FilingCategory>(initialTab ?? "overview");
+  useEffect(() => setTab(initialTab ?? "overview"), [event.id, initialTab]);
   const isProfile = event.isProfile === true; // searched company with no upcoming event
 
   // Company identity accent, derived from the initials/avatar colour and applied

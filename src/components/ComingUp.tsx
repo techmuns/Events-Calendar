@@ -1,16 +1,9 @@
 import type { CSSProperties } from "react";
-import type { ConcallItem, CorporateEvent } from "../types";
+import type { CorporateEvent } from "../types";
 import { companyAccent, eventTypeMeta, tokens } from "../theme";
-import { BellIcon, MicIcon, StarIcon } from "./icons";
+import { BellIcon, StarIcon } from "./icons";
 import { diffDays, parseISO, todayStart } from "../lib/dates";
 import { usePersistedOpen } from "../hooks/usePersistedOpen";
-
-const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
-function shortDate(iso: string): string {
-  const [y, m, d] = iso.split("-").map(Number);
-  if (!y || !m) return iso;
-  return `${d} ${MONTHS[m - 1]}`;
-}
 
 type Tone = "today" | "soon" | "later";
 // How near is this event? Drives the reminder pill's wording and urgency colour.
@@ -27,28 +20,23 @@ const TONE: Record<Tone, { color: string; bg: string; border: string }> = {
   later: { color: tokens.primaryText, bg: tokens.primaryLight, border: tokens.primaryBorder },
 };
 
-// On-open reminder strip, collapsible so it never buries the agenda: the header
-// (with the next event) is always visible; the soonest upcoming events and the
-// just-announced earnings calls expand on click, like the density panel.
+// On-open reminder strip for the user's watchlist only, collapsible so it never
+// buries the agenda: the header (with the next watchlisted event) is always
+// visible; the upcoming events expand on click, like the density panel.
 export function ComingUp({
   events,
   watchlistCount,
-  concalls,
   isStarred,
   onOpenEvent,
-  onOpenConcall,
 }: {
   events: CorporateEvent[];
   watchlistCount: number;
-  concalls: ConcallItem[];
   isStarred: (ticker: string) => boolean;
   onOpenEvent: (e: CorporateEvent) => void;
-  onOpenConcall: (c: ConcallItem) => void;
 }) {
   const [open, setOpen] = usePersistedOpen("ec_comingup_open", false);
   const reminders = events.slice(0, 12);
-  const calls = concalls.slice(0, 12);
-  const hasContent = reminders.length > 0 || calls.length > 0;
+  const hasContent = reminders.length > 0;
 
   // Watchlist has nothing coming up — show a quiet one-line hint instead of the
   // full panel, so the feature stays discoverable without taking space.
@@ -247,54 +235,6 @@ export function ComingUp({
                   </button>
                 );
               })}
-            </div>
-          )}
-
-          {/* Handy earnings-call intimations */}
-          {calls.length > 0 && (
-            <div style={{ borderTop: `1px solid ${tokens.border}`, padding: "9px 14px 11px", background: "var(--detail-header-bg)" }}>
-              <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 8 }}>
-                <span style={{ color: "#7c3aed", display: "inline-flex" }}>
-                  <MicIcon size={13} />
-                </span>
-                <span style={{ fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.04em", color: tokens.textHint }}>
-                  Earnings calls just announced
-                </span>
-              </div>
-              <div style={{ display: "flex", gap: 8, overflowX: "auto" }}>
-                {calls.map((c) => {
-                  const accent = companyAccent(c.ticker || c.company);
-                  return (
-                    <button
-                      key={c.id}
-                      onClick={() => onOpenConcall(c)}
-                      className="card-hover"
-                      title={`${c.company} — open earnings calls`}
-                      style={{
-                        cursor: "pointer",
-                        flexShrink: 0,
-                        display: "flex",
-                        flexDirection: "column",
-                        gap: 3,
-                        textAlign: "left",
-                        padding: "7px 11px",
-                        borderRadius: 10,
-                        border: `1px solid ${tokens.border}`,
-                        borderLeft: `3px solid ${accent}`,
-                        background: tokens.surface,
-                        maxWidth: 220,
-                      }}
-                    >
-                      <span style={{ fontSize: 12, fontWeight: 700, color: tokens.textPrimary, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
-                        {c.company}
-                      </span>
-                      <span style={{ fontSize: 10.5, color: tokens.textMuted, whiteSpace: "nowrap" }}>
-                        {c.ticker} · filed {shortDate(c.filedDate)}
-                      </span>
-                    </button>
-                  );
-                })}
-              </div>
             </div>
           )}
         </>

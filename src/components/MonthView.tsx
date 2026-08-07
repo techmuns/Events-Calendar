@@ -1,16 +1,18 @@
 import { useMemo, useState } from "react";
 import type { CSSProperties } from "react";
-import type { CorporateEvent } from "../types";
+import type { CorporateEvent, EventType } from "../types";
 import { eventTypeMeta, tokens } from "../theme";
-import { EventTypeChip, StatusBadge } from "./badges";
-import { ChevronLeftIcon, ChevronRightIcon } from "./icons";
-import {
-  WEEKDAY_LABELS,
-  buildMonthMatrix,
-  formatMonthYear,
-  toISO,
-  todayStart,
-} from "../lib/dates";
+import { ChevronLeftIcon, ChevronRightIcon, ExternalLinkIcon } from "./icons";
+import { WEEKDAY_LABELS, buildMonthMatrix, parseISO, toISO, todayStart } from "../lib/dates";
+
+const WEEKDAYS_LONG = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
+const MONTHS_LONG = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
+function longDate(iso: string): string {
+  const d = parseISO(iso);
+  return `${WEEKDAYS_LONG[d.getDay()]}, ${d.getDate()} ${MONTHS_LONG[d.getMonth()]} ${d.getFullYear()}`;
+}
+// Event types present in a day, most-common first, for the day cell's count chips.
+const TYPE_ORDER: EventType[] = ["EARNINGS", "CONCALL", "DEMERGER"];
 
 export function MonthView({
   events,
@@ -37,21 +39,29 @@ export function MonthView({
   const todayISO = toISO(today);
   const selectedEvents = byDate.get(selected) ?? [];
 
+  // Segregate the selected day by event type (Earnings / Corporate Action / …).
+  const selectedGroups = useMemo(() => {
+    const g = new Map<EventType, CorporateEvent[]>();
+    for (const e of selectedEvents) {
+      const list = g.get(e.eventType) ?? [];
+      list.push(e);
+      g.set(e.eventType, list);
+    }
+    return TYPE_ORDER.filter((t) => g.has(t)).map((t) => [t, g.get(t)!] as const);
+  }, [selectedEvents]);
+
   const shift = (delta: number) => {
     const m = cursor.month + delta;
-    const year = cursor.year + Math.floor(m / 12);
-    const month = ((m % 12) + 12) % 12;
-    setCursor({ year, month });
+    setCursor({ year: cursor.year + Math.floor(m / 12), month: ((m % 12) + 12) % 12 });
   };
 
   const navBtn: CSSProperties = {
     cursor: "pointer",
-    border: `1px solid ${tokens.borderSolid}`,
+    border: `1px solid ${tokens.border}`,
     background: tokens.surface,
     borderRadius: 8,
-    width: 28,
-    height: 28,
-    fontSize: 12,
+    width: 30,
+    height: 30,
     color: tokens.textSecondary,
     display: "inline-flex",
     alignItems: "center",
@@ -59,17 +69,18 @@ export function MonthView({
   };
 
   return (
-    <div style={{ padding: 16 }}>
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 12 }}>
-        <div style={{ fontSize: 15, fontWeight: 700, color: tokens.textPrimary }}>
-          {formatMonthYear(new Date(cursor.year, cursor.month, 1))}
+    <div style={{ padding: 16, display: "flex", flexDirection: "column", height: "100%", minHeight: 0 }}>
+      {/* Month header */}
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 12, flexShrink: 0 }}>
+        <div style={{ fontSize: 16, fontWeight: 800, color: tokens.textPrimary, letterSpacing: "-0.01em" }}>
+          {MONTHS_LONG[cursor.month]} {cursor.year}
         </div>
         <div style={{ display: "flex", gap: 6 }}>
           <button style={navBtn} onClick={() => shift(-1)} aria-label="Previous month">
             <ChevronLeftIcon size={16} />
           </button>
           <button
-            style={{ ...navBtn, width: "auto", padding: "0 10px", fontSize: 12, fontWeight: 600 }}
+            style={{ ...navBtn, width: "auto", padding: "0 12px", fontSize: 12, fontWeight: 600 }}
             onClick={() => {
               setCursor({ year: today.getFullYear(), month: today.getMonth() });
               setSelected(todayISO);
@@ -83,18 +94,25 @@ export function MonthView({
         </div>
       </div>
 
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(7, 1fr)", gap: 4 }}>
+      {/* Weekday header */}
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(7, 1fr)", gap: 5, flexShrink: 0 }}>
         {WEEKDAY_LABELS.map((w) => (
-          <div key={w} style={{ textAlign: "center", fontSize: 10.5, fontWeight: 700, color: tokens.textHint, padding: "2px 0" }}>
+          <div key={w} style={{ textAlign: "center", fontSize: 10.5, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.04em", color: tokens.textHint, paddingBottom: 4 }}>
             {w}
           </div>
         ))}
+      </div>
+
+      {/* Day grid */}
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(7, 1fr)", gap: 5, flexShrink: 0 }}>
         {matrix.flat().map((d) => {
           const iso = toISO(d);
           const inMonth = d.getMonth() === cursor.month;
           const dayEvents = byDate.get(iso) ?? [];
           const isToday = iso === todayISO;
           const isSelected = iso === selected;
+          const dominant = TYPE_ORDER.find((t) => dayEvents.some((e) => e.eventType === t));
+          const meta = dominant ? eventTypeMeta[dominant] : null;
           return (
             <button
               key={iso}
@@ -102,71 +120,127 @@ export function MonthView({
               style={{
                 cursor: "pointer",
                 textAlign: "left",
-                minHeight: 62,
-                padding: 6,
+                minHeight: 66,
+                padding: "6px 7px",
                 borderRadius: 10,
-                background: isSelected ? tokens.primaryLight : tokens.surface,
-                border: `1px solid ${isSelected ? tokens.primaryBorder : tokens.border}`,
-                opacity: inMonth ? 1 : 0.4,
+                background: isSelected ? tokens.primaryLight : dayEvents.length ? tokens.surface : "transparent",
+                border: `1px solid ${isSelected ? tokens.primary : dayEvents.length ? tokens.border : "transparent"}`,
+                opacity: inMonth ? 1 : 0.35,
                 display: "flex",
                 flexDirection: "column",
-                gap: 4,
+                justifyContent: "space-between",
+                transition: "background 0.12s, border-color 0.12s",
               }}
             >
-              <div
+              <span
                 style={{
-                  fontSize: 11.5,
-                  fontWeight: isToday ? 700 : 500,
+                  fontSize: 12,
+                  fontWeight: isToday ? 800 : 600,
                   color: isToday ? "#fff" : tokens.textSecondary,
                   background: isToday ? tokens.primary : "transparent",
-                  width: isToday ? 20 : "auto",
-                  height: isToday ? 20 : "auto",
-                  borderRadius: "50%",
-                  display: "flex",
+                  minWidth: 21,
+                  height: 21,
+                  padding: "0 5px",
+                  borderRadius: 999,
+                  display: "inline-flex",
                   alignItems: "center",
                   justifyContent: "center",
                   alignSelf: "flex-start",
                 }}
               >
                 {d.getDate()}
-              </div>
-              <div style={{ display: "flex", flexWrap: "wrap", gap: 3 }}>
-                {dayEvents.slice(0, 4).map((e) => (
-                  <span
-                    key={e.id}
-                    title={`${e.company} · ${eventTypeMeta[e.eventType].label}`}
-                    style={{ width: 6, height: 6, borderRadius: "50%", background: eventTypeMeta[e.eventType].text }}
-                  />
-                ))}
-                {dayEvents.length > 4 && (
-                  <span style={{ fontSize: 9, color: tokens.textHint }}>+{dayEvents.length - 4}</span>
-                )}
-              </div>
+              </span>
+              {dayEvents.length > 0 && meta && (
+                <span
+                  style={{
+                    alignSelf: "flex-start",
+                    fontSize: 11,
+                    fontWeight: 800,
+                    color: meta.text,
+                    background: meta.bg,
+                    border: `1px solid ${meta.border}`,
+                    borderRadius: 7,
+                    padding: "1px 7px",
+                    lineHeight: 1.5,
+                  }}
+                  title={`${dayEvents.length} event${dayEvents.length > 1 ? "s" : ""}`}
+                >
+                  {dayEvents.length}
+                </span>
+              )}
             </button>
           );
         })}
       </div>
 
-      <div style={{ marginTop: 16, borderTop: `1px solid ${tokens.border}`, paddingTop: 12 }}>
-        <div style={{ fontSize: 12, fontWeight: 700, color: tokens.textSecondary, marginBottom: 8 }}>
-          {selectedEvents.length > 0
-            ? `${selectedEvents.length} event${selectedEvents.length > 1 ? "s" : ""} on ${selected}`
-            : `No events on ${selected}`}
+      {/* Selected-day detail — segregated by type, scrolls independently */}
+      <div style={{ marginTop: 14, borderTop: `1px solid ${tokens.border}`, paddingTop: 12, display: "flex", flexDirection: "column", flex: 1, minHeight: 0 }}>
+        <div style={{ fontSize: 13, fontWeight: 700, color: tokens.textPrimary, marginBottom: 10, flexShrink: 0 }}>
+          {longDate(selected)}
+          <span style={{ color: tokens.textHint, fontWeight: 600 }}>
+            {" · "}
+            {selectedEvents.length} event{selectedEvents.length === 1 ? "" : "s"}
+          </span>
         </div>
-        <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-          {selectedEvents.map((e) => (
-            <button
-              key={e.id}
-              onClick={() => onSelect(e)}
-              style={{ cursor: "pointer", border: "none", background: "transparent", padding: "2px 0", textAlign: "left", display: "flex", alignItems: "center", gap: 10 }}
-            >
-              <EventTypeChip type={e.eventType} />
-              <span style={{ fontSize: 13, fontWeight: 600, color: tokens.textPrimary }}>{e.company}</span>
-              <span style={{ fontSize: 12, color: tokens.textMuted }}>{e.subtype}</span>
-              <StatusBadge status={e.status} />
-            </button>
-          ))}
-        </div>
+        {selectedEvents.length === 0 ? (
+          <div style={{ fontSize: 12.5, color: tokens.textHint }}>No events scheduled on this day.</div>
+        ) : (
+          <div style={{ overflowY: "auto", display: "flex", flexDirection: "column", gap: 12, paddingRight: 4 }}>
+            {selectedGroups.map(([type, list]) => {
+              const m = eventTypeMeta[type];
+              return (
+                <div key={type}>
+                  <div style={{ display: "flex", alignItems: "center", gap: 7, marginBottom: 6 }}>
+                    <span style={{ width: 8, height: 8, borderRadius: "50%", background: m.hex }} />
+                    <span style={{ fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.04em", color: tokens.textMuted }}>
+                      {m.label}
+                    </span>
+                    <span style={{ fontSize: 11, fontWeight: 600, color: tokens.textHint }}>{list.length}</span>
+                  </div>
+                  <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+                    {list.map((e) => (
+                      <button
+                        key={e.id}
+                        onClick={() => onSelect(e)}
+                        className="row-hover"
+                        style={{
+                          cursor: "pointer",
+                          border: `1px solid ${tokens.border}`,
+                          borderLeft: `3px solid ${m.hex}`,
+                          background: tokens.surface,
+                          borderRadius: 9,
+                          padding: "8px 11px",
+                          textAlign: "left",
+                          display: "flex",
+                          alignItems: "center",
+                          gap: 10,
+                        }}
+                      >
+                        <span style={{ fontSize: 13, fontWeight: 700, color: tokens.textPrimary, flexShrink: 1, minWidth: 0, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+                          {e.company}
+                        </span>
+                        <span style={{ fontSize: 11.5, fontWeight: 600, color: tokens.textHint, flexShrink: 0 }}>{e.ticker}</span>
+                        <span style={{ fontSize: 12, color: tokens.textMuted, flex: 1, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{e.subtype}</span>
+                        {e.sourceUrl && (
+                          <a
+                            href={e.sourceUrl}
+                            target="_blank"
+                            rel="noreferrer"
+                            onClick={(ev) => ev.stopPropagation()}
+                            title={`Open ${e.exchange} filing`}
+                            style={{ display: "inline-flex", alignItems: "center", gap: 4, fontSize: 11.5, fontWeight: 600, color: tokens.textSecondary, textDecoration: "none", flexShrink: 0 }}
+                          >
+                            {e.exchange} <ExternalLinkIcon size={12} />
+                          </a>
+                        )}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
       </div>
     </div>
   );
