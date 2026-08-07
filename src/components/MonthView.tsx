@@ -2,7 +2,7 @@ import { useMemo, useState } from "react";
 import type { CSSProperties } from "react";
 import type { CorporateEvent, EventType } from "../types";
 import { eventTypeMeta, tokens } from "../theme";
-import { ChevronLeftIcon, ChevronRightIcon, ExternalLinkIcon } from "./icons";
+import { ChevronLeftIcon, ChevronRightIcon, ExternalLinkIcon, XIcon } from "./icons";
 import { WEEKDAY_LABELS, buildMonthMatrix, parseISO, toISO, todayStart } from "../lib/dates";
 
 const WEEKDAYS_LONG = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
@@ -11,8 +11,132 @@ function longDate(iso: string): string {
   const d = parseISO(iso);
   return `${WEEKDAYS_LONG[d.getDay()]}, ${d.getDate()} ${MONTHS_LONG[d.getMonth()]} ${d.getFullYear()}`;
 }
-// Event types present in a day, most-common first, for the day cell's count chips.
 const TYPE_ORDER: EventType[] = ["EARNINGS", "CONCALL", "DEMERGER"];
+
+// Group a day's events by type, most-common type first, for a tidy segregated list.
+function groupByType(events: CorporateEvent[]): (readonly [EventType, CorporateEvent[]])[] {
+  const g = new Map<EventType, CorporateEvent[]>();
+  for (const e of events) (g.get(e.eventType) ?? g.set(e.eventType, []).get(e.eventType)!).push(e);
+  return TYPE_ORDER.filter((t) => g.has(t)).map((t) => [t, g.get(t)!] as const);
+}
+
+// Popup that lists every event on a clicked day, segregated by type.
+function DayEventsModal({
+  iso,
+  events,
+  onSelect,
+  onClose,
+}: {
+  iso: string;
+  events: CorporateEvent[];
+  onSelect: (e: CorporateEvent) => void;
+  onClose: () => void;
+}) {
+  const groups = groupByType(events);
+  return (
+    <div
+      onClick={onClose}
+      role="presentation"
+      style={{
+        position: "fixed",
+        inset: 0,
+        zIndex: 150,
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        padding: 24,
+        background: "rgba(8, 12, 22, 0.55)",
+        backdropFilter: "blur(6px)",
+        WebkitBackdropFilter: "blur(6px)",
+        animation: "fadeIn 0.16s ease",
+      }}
+    >
+      <div
+        onClick={(e) => e.stopPropagation()}
+        role="dialog"
+        aria-modal="true"
+        style={{
+          width: "min(560px, 100%)",
+          maxHeight: "min(82vh, 720px)",
+          background: tokens.cardBg,
+          border: `1px solid ${tokens.border}`,
+          borderRadius: 18,
+          boxShadow: tokens.shadowPop,
+          overflow: "hidden",
+          display: "flex",
+          flexDirection: "column",
+        }}
+      >
+        <div style={{ display: "flex", alignItems: "center", gap: 12, padding: "15px 18px", borderBottom: `1px solid ${tokens.border}`, background: "var(--detail-header-bg)" }}>
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div style={{ fontSize: 15.5, fontWeight: 800, color: tokens.textPrimary, letterSpacing: "-0.01em" }}>{longDate(iso)}</div>
+            <div style={{ fontSize: 12.5, color: tokens.textMuted, marginTop: 1 }}>
+              {events.length} event{events.length === 1 ? "" : "s"} scheduled
+            </div>
+          </div>
+          <button
+            onClick={onClose}
+            aria-label="Close"
+            style={{ width: 30, height: 30, borderRadius: 8, display: "inline-flex", alignItems: "center", justifyContent: "center", cursor: "pointer", border: `1px solid ${tokens.border}`, background: tokens.surface, color: tokens.textMuted, flexShrink: 0 }}
+          >
+            <XIcon size={16} />
+          </button>
+        </div>
+        <div style={{ overflowY: "auto", padding: 16, display: "flex", flexDirection: "column", gap: 14 }}>
+          {groups.map(([type, list]) => {
+            const m = eventTypeMeta[type];
+            return (
+              <div key={type}>
+                <div style={{ display: "flex", alignItems: "center", gap: 7, marginBottom: 7 }}>
+                  <span style={{ width: 8, height: 8, borderRadius: "50%", background: m.hex }} />
+                  <span style={{ fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.04em", color: tokens.textMuted }}>{m.label}</span>
+                  <span style={{ fontSize: 11, fontWeight: 600, color: tokens.textHint }}>{list.length}</span>
+                </div>
+                <div style={{ display: "flex", flexDirection: "column", gap: 5 }}>
+                  {list.map((e) => (
+                    <button
+                      key={e.id}
+                      onClick={() => onSelect(e)}
+                      className="card-hover"
+                      style={{
+                        cursor: "pointer",
+                        border: `1px solid ${tokens.border}`,
+                        borderLeft: `3px solid ${m.hex}`,
+                        background: tokens.surface,
+                        borderRadius: 10,
+                        padding: "9px 12px",
+                        textAlign: "left",
+                        display: "flex",
+                        alignItems: "center",
+                        gap: 10,
+                      }}
+                    >
+                      <span style={{ fontSize: 13, fontWeight: 700, color: tokens.textPrimary, minWidth: 0, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{e.company}</span>
+                      <span style={{ fontSize: 11.5, fontWeight: 600, color: tokens.textHint, flexShrink: 0 }}>{e.ticker}</span>
+                      <span style={{ fontSize: 12, color: tokens.textMuted, flex: 1, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{e.subtype}</span>
+                      {e.sourceUrl && (
+                        <a
+                          href={e.sourceUrl}
+                          target="_blank"
+                          rel="noreferrer"
+                          onClick={(ev) => ev.stopPropagation()}
+                          title={`Open ${e.exchange} filing`}
+                          style={{ display: "inline-flex", alignItems: "center", gap: 4, fontSize: 11.5, fontWeight: 600, color: tokens.textSecondary, textDecoration: "none", flexShrink: 0 }}
+                        >
+                          {e.exchange} <ExternalLinkIcon size={12} />
+                        </a>
+                      )}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+    </div>
+  );
+}
 
 export function MonthView({
   events,
@@ -24,6 +148,7 @@ export function MonthView({
   const today = todayStart();
   const [cursor, setCursor] = useState({ year: today.getFullYear(), month: today.getMonth() });
   const [selected, setSelected] = useState<string>(toISO(today));
+  const [dayModal, setDayModal] = useState<string | null>(null);
 
   const byDate = useMemo(() => {
     const map = new Map<string, CorporateEvent[]>();
@@ -37,18 +162,6 @@ export function MonthView({
 
   const matrix = useMemo(() => buildMonthMatrix(cursor.year, cursor.month), [cursor]);
   const todayISO = toISO(today);
-  const selectedEvents = byDate.get(selected) ?? [];
-
-  // Segregate the selected day by event type (Earnings / Corporate Action / …).
-  const selectedGroups = useMemo(() => {
-    const g = new Map<EventType, CorporateEvent[]>();
-    for (const e of selectedEvents) {
-      const list = g.get(e.eventType) ?? [];
-      list.push(e);
-      g.set(e.eventType, list);
-    }
-    return TYPE_ORDER.filter((t) => g.has(t)).map((t) => [t, g.get(t)!] as const);
-  }, [selectedEvents]);
 
   const shift = (delta: number) => {
     const m = cursor.month + delta;
@@ -70,7 +183,6 @@ export function MonthView({
 
   return (
     <div style={{ padding: 16, display: "flex", flexDirection: "column", height: "100%", minHeight: 0 }}>
-      {/* Month header */}
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 12, flexShrink: 0 }}>
         <div style={{ fontSize: 16, fontWeight: 800, color: tokens.textPrimary, letterSpacing: "-0.01em" }}>
           {MONTHS_LONG[cursor.month]} {cursor.year}
@@ -94,7 +206,6 @@ export function MonthView({
         </div>
       </div>
 
-      {/* Weekday header */}
       <div style={{ display: "grid", gridTemplateColumns: "repeat(7, 1fr)", gap: 5, flexShrink: 0 }}>
         {WEEKDAY_LABELS.map((w) => (
           <div key={w} style={{ textAlign: "center", fontSize: 10.5, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.04em", color: tokens.textHint, paddingBottom: 4 }}>
@@ -103,8 +214,7 @@ export function MonthView({
         ))}
       </div>
 
-      {/* Day grid */}
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(7, 1fr)", gap: 5, flexShrink: 0 }}>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(7, 1fr)", gridTemplateRows: "repeat(6, 1fr)", gap: 5, flex: 1, minHeight: 320 }}>
         {matrix.flat().map((d) => {
           const iso = toISO(d);
           const inMonth = d.getMonth() === cursor.month;
@@ -116,11 +226,15 @@ export function MonthView({
           return (
             <button
               key={iso}
-              onClick={() => setSelected(iso)}
+              onClick={() => {
+                setSelected(iso);
+                if (dayEvents.length) setDayModal(iso);
+              }}
+              title={dayEvents.length ? `${dayEvents.length} event${dayEvents.length > 1 ? "s" : ""} — click to view` : undefined}
               style={{
-                cursor: "pointer",
+                cursor: dayEvents.length ? "pointer" : "default",
                 textAlign: "left",
-                minHeight: 66,
+                minHeight: 62,
                 padding: "6px 7px",
                 borderRadius: 10,
                 background: isSelected ? tokens.primaryLight : dayEvents.length ? tokens.surface : "transparent",
@@ -163,7 +277,6 @@ export function MonthView({
                     padding: "1px 7px",
                     lineHeight: 1.5,
                   }}
-                  title={`${dayEvents.length} event${dayEvents.length > 1 ? "s" : ""}`}
                 >
                   {dayEvents.length}
                 </span>
@@ -173,75 +286,17 @@ export function MonthView({
         })}
       </div>
 
-      {/* Selected-day detail — segregated by type, scrolls independently */}
-      <div style={{ marginTop: 14, borderTop: `1px solid ${tokens.border}`, paddingTop: 12, display: "flex", flexDirection: "column", flex: 1, minHeight: 0 }}>
-        <div style={{ fontSize: 13, fontWeight: 700, color: tokens.textPrimary, marginBottom: 10, flexShrink: 0 }}>
-          {longDate(selected)}
-          <span style={{ color: tokens.textHint, fontWeight: 600 }}>
-            {" · "}
-            {selectedEvents.length} event{selectedEvents.length === 1 ? "" : "s"}
-          </span>
-        </div>
-        {selectedEvents.length === 0 ? (
-          <div style={{ fontSize: 12.5, color: tokens.textHint }}>No events scheduled on this day.</div>
-        ) : (
-          <div style={{ overflowY: "auto", display: "flex", flexDirection: "column", gap: 12, paddingRight: 4 }}>
-            {selectedGroups.map(([type, list]) => {
-              const m = eventTypeMeta[type];
-              return (
-                <div key={type}>
-                  <div style={{ display: "flex", alignItems: "center", gap: 7, marginBottom: 6 }}>
-                    <span style={{ width: 8, height: 8, borderRadius: "50%", background: m.hex }} />
-                    <span style={{ fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.04em", color: tokens.textMuted }}>
-                      {m.label}
-                    </span>
-                    <span style={{ fontSize: 11, fontWeight: 600, color: tokens.textHint }}>{list.length}</span>
-                  </div>
-                  <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-                    {list.map((e) => (
-                      <button
-                        key={e.id}
-                        onClick={() => onSelect(e)}
-                        className="row-hover"
-                        style={{
-                          cursor: "pointer",
-                          border: `1px solid ${tokens.border}`,
-                          borderLeft: `3px solid ${m.hex}`,
-                          background: tokens.surface,
-                          borderRadius: 9,
-                          padding: "8px 11px",
-                          textAlign: "left",
-                          display: "flex",
-                          alignItems: "center",
-                          gap: 10,
-                        }}
-                      >
-                        <span style={{ fontSize: 13, fontWeight: 700, color: tokens.textPrimary, flexShrink: 1, minWidth: 0, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
-                          {e.company}
-                        </span>
-                        <span style={{ fontSize: 11.5, fontWeight: 600, color: tokens.textHint, flexShrink: 0 }}>{e.ticker}</span>
-                        <span style={{ fontSize: 12, color: tokens.textMuted, flex: 1, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{e.subtype}</span>
-                        {e.sourceUrl && (
-                          <a
-                            href={e.sourceUrl}
-                            target="_blank"
-                            rel="noreferrer"
-                            onClick={(ev) => ev.stopPropagation()}
-                            title={`Open ${e.exchange} filing`}
-                            style={{ display: "inline-flex", alignItems: "center", gap: 4, fontSize: 11.5, fontWeight: 600, color: tokens.textSecondary, textDecoration: "none", flexShrink: 0 }}
-                          >
-                            {e.exchange} <ExternalLinkIcon size={12} />
-                          </a>
-                        )}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        )}
-      </div>
+      {dayModal && (
+        <DayEventsModal
+          iso={dayModal}
+          events={byDate.get(dayModal) ?? []}
+          onSelect={(e) => {
+            setDayModal(null);
+            onSelect(e);
+          }}
+          onClose={() => setDayModal(null)}
+        />
+      )}
     </div>
   );
 }

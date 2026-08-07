@@ -491,7 +491,7 @@ export default function App() {
           <KpiShimmer />
         )}
 
-        {result && !isSearching && (
+        {result && !isSearching && filters.universe === "WATCHLIST" && (
           <ComingUp
             events={reminderEvents}
             watchlistCount={watchlist.set.size}
