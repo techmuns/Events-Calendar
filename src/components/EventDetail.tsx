@@ -334,17 +334,22 @@ function quarterOf(f: CompanyFiling): Quarter | null {
 function ConcallHistory({ concalls, accent }: { concalls: CompanyFiling[]; accent: string }) {
   const now = new Date();
   const byQuarter = new Map<string, CompanyFiling>();
-  // Anchor the timeline to the newest of {this quarter, latest call on record}
-  // so a company that hasn't reported the current quarter still shows the gap.
+  // Anchor the top to the newest of {this quarter, latest call on record} so a
+  // company that hasn't reported the current quarter still shows the gap; anchor
+  // the bottom to the *earliest* call on record so we don't pad the list with
+  // "not available" for quarters before the company ever held a call.
   const currentQ = callMonthToQuarter(now.getFullYear(), now.getMonth() + 1);
   let top = currentQ;
+  let earliest = currentQ;
   for (const f of concalls) {
     const q = quarterOf(f);
     if (!q) continue;
     if (!byQuarter.has(q.key)) byQuarter.set(q.key, f);
     if (quarterRank(q) > quarterRank(top)) top = q;
+    if (quarterRank(q) < quarterRank(earliest)) earliest = q;
   }
-  const grid = lastNQuarters(top.endY, top.endM, 8);
+  const n = Math.min(8, Math.max(1, quarterRank(top) - quarterRank(earliest) + 1));
+  const grid = lastNQuarters(top.endY, top.endM, n);
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 9 }}>
       {grid.map((q) => {
@@ -354,6 +359,9 @@ function ConcallHistory({ concalls, accent }: { concalls: CompanyFiling[]; accen
         // yet held, not one the company skipped.
         return <ConcallMissing key={q.key} q={q} awaited={quarterRank(q) >= quarterRank(currentQ)} />;
       })}
+      <div style={{ fontSize: 11, color: tokens.textHint, marginTop: 3, lineHeight: 1.5 }}>
+        Earnings-call transcripts &amp; audio are sourced from Screener. Quarters with no published call show as unavailable — small companies often hold calls only occasionally.
+      </div>
     </div>
   );
 }

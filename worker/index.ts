@@ -437,7 +437,7 @@ function categorizeFiling(desc: string, text: string): FilingCategory | null {
   const d = (desc ?? "").toLowerCase();
   const t = (text ?? "").toLowerCase();
   const s = `${d} ${t}`;
-  if (/scheme of arrangement|de-?merg|spin-?off|composite scheme|hive-?off|slump sale/.test(s)) return "SCHEME";
+  if (/scheme of arrangement|scheme of amalgamation|amalgamat|de-?merg|spin-?off|composite scheme|hive-?off|slump sale/.test(s)) return "SCHEME";
   if (/presentation/.test(s)) return "PRESENTATION";
   // NSE bundles meets + calls under one `desc`; trust the body to spot a call.
   if (/con\.? ?call|conference call|earnings call|analyst call|investor call|dial-?in|audio call|webcast/.test(t))
@@ -514,7 +514,7 @@ function pressTopic(text: string): string {
   if (/fund[\s-]?rais|\bqip\b|preferential (?:issue|allotment)|rights issue|\bncd\b|debenture|commercial paper|bond issue|\bwarrant/.test(t)) return "Fund Raising";
   if (/\baward(?:ed|s)?\b|recognit|accolade|honou?red|\branked\b|certif|\bwins?\b[^.]*award/.test(t)) return "Award & Recognition";
   if (/launch(?:es|ed|ing)?|unveil|introduc|new product|foray|partnership|collaborat|tie-?up|\bmou\b|alliance/.test(t)) return "Business Update";
-  if (/resign|appoint|cessation|(?:re)?designat|\bkmp\b|board of directors|managing director|\bceo\b|\bcfo\b|company secretary/.test(t)) return "Board / Management Update";
+  if (/resign|appoint|cessation|(?:re)?designat|\bkmp\b|board of directors?|change in director|directorate|managing director|\bceo\b|\bcfo\b|company secretary/.test(t)) return "Board / Management Update";
   if (/investor (?:meet|conference|day|presentation)|analyst meet|road ?show|earnings call|con(?:ference)? ?call/.test(t)) return "Investor Update";
   if (/force majeure|plant shutdown|monthly (?:sales|business)|(?:total|provisional|wholesale|retail) sales|sales (?:volume|update|figures|for the month)|dispatches|production (?:volume|update)|operational update|business update/.test(t)) return "Operational Update";
   return "";
@@ -534,6 +534,13 @@ function shortHeading(raw: string): string {
   s = s
     .replace(/\((?:formerly|erstwhile)[^)]*\)/gi, "") // drop "(formerly … Limited)"
     .replace(/^['"“”‘’\s\-–—]+/, "") // leading quotes/dashes (e.g. "titled - X")
+    .replace(/^[A-Z0-9&.\-]{2,14}:\s*/, "") // leading all-caps ticker prefix "AFSL:"
+    // "Intimation/Disclosure under Regulation 30 [read with …] [of … Regulations, 2015] for …"
+    .replace(
+      /^(?:intimation|disclosure|information|notice|announcement|update|submission)\s+(?:under|pursuant to|as per|in terms of|u\/[sr])\s+regulation[s]?\s+[0-9][0-9()a-z]*(?:\s*(?:,|and|&|\/|to)\s*[0-9][0-9()a-z]*)*\s*(?:\([^)]*\)\s*)?(?:read with\s+[^,]*?\s+)?(?:of\s+(?:the\s+)?(?:sebi\s+)?[^,]*?regulations?(?:\s*,?\s*\d{4})?\s*)?[,:\-\s]*(?:for|regarding|in respect of|w\.?r\.?t\.?|of|about|:)?\s+/i,
+      "",
+    )
+    .replace(/^['"“”‘’\s\-–—:]+/, "")
     .replace(/^submission of\s+(?:the\s+)?(?:press release|newspaper (?:advertisement|publication)|disclosure|intimation)\s*/i, "")
     .replace(/^(?:titled|entitled)\b\s*[:\-–—]*\s*['"“”‘’]?\s*/i, "") // residual "Titled - X"
     .replace(/^(?:sub|subject|re|ref)\s*[:\-]\s*/i, "")
@@ -561,6 +568,23 @@ function shortHeading(raw: string): string {
   return s.charAt(0).toUpperCase() + s.slice(1);
 }
 
+// Corporate-action schemes → a short, proper heading (so "…Intimation under
+// Regulation 30 for proposed scheme of amalgamation…" reads as a heading).
+function schemeTopic(text: string): string {
+  const t = text.toLowerCase();
+  if (/de-?merg/.test(t)) return "Demerger";
+  if (/amalgamat/.test(t)) return "Scheme of Amalgamation";
+  if (/composite scheme/.test(t)) return "Composite Scheme";
+  if (/scheme of arrangement/.test(t)) return "Scheme of Arrangement";
+  if (/slump sale/.test(t)) return "Slump Sale";
+  if (/hive-?off|spin-?off/.test(t)) return "Spin-off";
+  if (/reduction of (?:share )?capital|capital reduction/.test(t)) return "Capital Reduction";
+  if (/buy-?back/.test(t)) return "Share Buyback";
+  if (/\bmerger\b/.test(t)) return "Merger";
+  if (/\bscheme\b/.test(t)) return "Scheme of Arrangement";
+  return "";
+}
+
 // Turn a terse/sentence filing text into a proper, short heading — never a full
 // sentence — consistently across every company, event and tab.
 function friendlyTitle(cat: FilingCategory, rawText: string, desc: string): string {
@@ -572,7 +596,7 @@ function friendlyTitle(cat: FilingCategory, rawText: string, desc: string): stri
 
   if (cat === "PRESENTATION") return period ? `${period} Results Presentation` : "Investor Presentation";
   if (cat === "CONCALL") return period ? `Earnings Call · ${period}` : "Earnings Call";
-  if (cat === "SCHEME") return shortHeading(raw) || "Corporate Action";
+  if (cat === "SCHEME") return schemeTopic(raw) || shortHeading(raw) || "Corporate Action";
   if (cat === "MEET") {
     if (/transcript/.test(t)) return period ? `Earnings Call Transcript · ${period}` : "Earnings Call — Transcript";
     if (/recording|audio|\brec\b/.test(t)) return period ? `Earnings Call Audio · ${period}` : "Earnings Call — Audio";
