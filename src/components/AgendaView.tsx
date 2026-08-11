@@ -17,6 +17,7 @@ import {
   UsersIcon,
 } from "./icons";
 import { type Bucket, bucketFor, formatDate, parseISO, todayStart } from "../lib/dates";
+import { actionPhrase, proximityOf, type Tone, toneColor, toneSkin } from "../lib/proximity";
 import { useCompanyFilings } from "../hooks/useCompanyFilings";
 
 type IconCmp = (p: { size?: number }) => JSX.Element;
@@ -41,8 +42,34 @@ interface RowHandlers {
   onToggleStar: (ticker: string) => void;
 }
 
-function DateBlock({ iso, accent }: { iso: string; accent: string }) {
+function DateBlock({ iso, accent, tone }: { iso: string; accent: string; tone: Tone }) {
   const d = parseISO(iso);
+  // Today & tomorrow trade the calendar block for a solid urgency chip so the
+  // eye lands on them first — red "TODAY", amber "TMRW".
+  if (tone === "today" || tone === "tomorrow") {
+    const s = toneSkin(tone);
+    return (
+      <div
+        style={{
+          width: 46,
+          height: 46,
+          flexShrink: 0,
+          borderRadius: 11,
+          border: `1px solid ${s.bd}`,
+          background: s.bg,
+          color: s.fg,
+          display: "flex",
+          flexDirection: "column",
+          alignItems: "center",
+          justifyContent: "center",
+          gap: 1,
+        }}
+      >
+        <div style={{ fontSize: 16, fontWeight: 800, lineHeight: 1 }}>{d.getDate()}</div>
+        <div style={{ fontSize: 8, fontWeight: 800, letterSpacing: "0.05em" }}>{tone === "today" ? "TODAY" : "TMRW"}</div>
+      </div>
+    );
+  }
   return (
     <div
       style={{
@@ -153,13 +180,16 @@ function EventRow({
   onToggleStar,
   selected,
   isDark,
-  isToday,
   isRecent,
-}: { e: CorporateEvent; diff?: EventDiff; selected: boolean; isDark: boolean; isToday: boolean; isRecent: boolean } & RowHandlers) {
+}: { e: CorporateEvent; diff?: EventDiff; selected: boolean; isDark: boolean; isRecent: boolean } & RowHandlers) {
   const [expanded, setExpanded] = useState(false);
   const [hovered, setHovered] = useState(false);
   const starred = isStarred(e.ticker);
   const accent = companyAccent(e.ticker || e.company);
+  const prox = proximityOf(e.date);
+  // Faint whole-row wash for the two most imminent buckets (only when the row
+  // isn't already carrying a selected/hover accent, so states don't stack).
+  const urgentWash = prox.tone === "today" ? tokens.todayWash : prox.tone === "tomorrow" ? tokens.tmrwWash : "transparent";
 
   // Three visual states, scoped to the light theme so dark mode is untouched:
   //   default  → neutral, transparent
@@ -181,7 +211,7 @@ function EventRow({
       ? `linear-gradient(90deg, color-mix(in srgb, ${accent} 18%, transparent) 0%, color-mix(in srgb, ${accent} 7%, transparent) 100%)`
       : hoverPreview
         ? `linear-gradient(90deg, color-mix(in srgb, ${accent} 11%, transparent) 0%, color-mix(in srgb, ${accent} 3%, transparent) 100%)`
-        : "transparent",
+        : urgentWash,
     boxShadow: hoverPreview ? "0 2px 10px rgba(15, 23, 42, 0.07)" : "none",
     transform: hoverPreview ? "translateY(-1px)" : "none",
     transition: "background 160ms ease, box-shadow 160ms ease, transform 160ms ease, border-color 160ms ease",
@@ -230,7 +260,7 @@ function EventRow({
       >
         <StarIcon size={17} filled={starred} />
       </button>
-      <DateBlock iso={e.date} accent={accent} />
+      <DateBlock iso={e.date} accent={accent} tone={prox.tone} />
       <div style={{ flex: 1, minWidth: 0 }}>
         <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
           <span
@@ -247,22 +277,6 @@ function EventRow({
             {e.company}
           </span>
           <span style={{ fontSize: 11.5, fontWeight: 600, color: warm ? tokens.textSecondary : tokens.textHint }}>{e.ticker}</span>
-          {isToday && (
-            <span
-              style={{
-                fontSize: 9.5,
-                fontWeight: 800,
-                letterSpacing: "0.04em",
-                color: "#dc2626",
-                background: "color-mix(in srgb, #dc2626 12%, transparent)",
-                border: "1px solid color-mix(in srgb, #dc2626 30%, transparent)",
-                borderRadius: 6,
-                padding: "1px 6px",
-              }}
-            >
-              TODAY
-            </span>
-          )}
           {isRecent && (
             <span
               style={{
@@ -282,6 +296,12 @@ function EventRow({
           {diff?.isRevised && <ChangeBadge kind="moved" />}
         </div>
         <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 3, fontSize: 12, color: warm ? tokens.textSecondary : tokens.textMuted }}>
+          {(prox.tone === "today" || prox.tone === "tomorrow" || prox.tone === "soon") && (
+            <>
+              <span style={{ fontWeight: 700, color: toneColor(prox.tone), whiteSpace: "nowrap" }}>{actionPhrase(e.eventType, prox)}</span>
+              <span style={{ color: tokens.textHint }}>·</span>
+            </>
+          )}
           <span style={{ whiteSpace: "nowrap" }}>{e.subtype}</span>
           {e.sector && (
             <>
@@ -425,7 +445,7 @@ export function AgendaView({
             <span style={{ color: tokens.textHint, fontWeight: 600 }}> · {groups[b].length}</span>
           </div>
           {groups[b].map((e) => (
-            <EventRow key={e.id} e={e} diff={diffs?.get(e.id)} selected={selectedId === e.id} isDark={isDark} isToday={b === "Today"} isRecent={b === "Recent"} {...handlers} />
+            <EventRow key={e.id} e={e} diff={diffs?.get(e.id)} selected={selectedId === e.id} isDark={isDark} isRecent={b === "Recent"} {...handlers} />
           ))}
         </div>
       ))}

@@ -78,8 +78,8 @@ type View = "agenda" | "month" | "table";
 
 function KpiShimmer() {
   return (
-    <div style={{ display: "grid", gap: 14, gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))" }}>
-      {Array.from({ length: 4 }).map((_, i) => (
+    <div className="kpi-grid">
+      {Array.from({ length: 3 }).map((_, i) => (
         <div key={i} className="shimmer" style={{ height: 76, borderRadius: 14 }} />
       ))}
     </div>
@@ -486,7 +486,7 @@ export default function App() {
         <FiltersBar filters={filters} onChange={handleFilters} counts={typeCounts} isDark={isDark} />
 
         {result ? (
-          <KpiRow events={baseFiltered} generatedAt={result.generatedAt} live={result.live} />
+          <KpiRow events={baseFiltered} onSelect={selectEvent} />
         ) : (
           <KpiShimmer />
         )}

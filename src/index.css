@@ -58,6 +58,17 @@
   /* Details-panel company header — same 110deg linear treatment as the KPIs */
   --detail-header-bg: linear-gradient(110deg, #eef4ff 0%, #f4f7ff 50%, #fcfdff 100%);
 
+  /* Event imminence — today (red) & tomorrow (amber) urgency accents. `wash` is
+     the barely-there row tint; `bg`/`bd`/`fg` drive date blocks, chips & labels. */
+  --today-fg: #dc2626;
+  --today-bg: rgba(220, 38, 38, 0.1);
+  --today-bd: rgba(220, 38, 38, 0.3);
+  --today-wash: rgba(220, 38, 38, 0.045);
+  --tmrw-fg: #b45309;
+  --tmrw-bg: rgba(245, 158, 11, 0.15);
+  --tmrw-bd: rgba(245, 158, 11, 0.36);
+  --tmrw-wash: rgba(245, 158, 11, 0.05);
+
   /* Density chart */
   --density-panel-bg: linear-gradient(180deg, #ffffff 0%, #fafaff 55%, #f7f8ff 100%);
   --density-panel-bd: #e8eafc;
@@ -118,6 +129,15 @@
 
   --detail-header-bg: linear-gradient(110deg, #1a2740 0%, #162238 55%, #131d30 100%);
 
+  --today-fg: #fca5a5;
+  --today-bg: rgba(239, 68, 68, 0.16);
+  --today-bd: rgba(239, 68, 68, 0.42);
+  --today-wash: rgba(239, 68, 68, 0.08);
+  --tmrw-fg: #fcd34d;
+  --tmrw-bg: rgba(245, 158, 11, 0.16);
+  --tmrw-bd: rgba(245, 158, 11, 0.42);
+  --tmrw-wash: rgba(245, 158, 11, 0.08);
+
   --density-panel-bg: linear-gradient(180deg, #0f1a2e 0%, #0d1727 100%);
   --density-panel-bd: #22314c;
   --density-grid: rgba(148, 163, 184, 0.09);
@@ -175,6 +195,15 @@
     --kpi4-bd: #1a4a34;
 
     --detail-header-bg: linear-gradient(110deg, #1a2740 0%, #162238 55%, #131d30 100%);
+
+    --today-fg: #fca5a5;
+    --today-bg: rgba(239, 68, 68, 0.16);
+    --today-bd: rgba(239, 68, 68, 0.42);
+    --today-wash: rgba(239, 68, 68, 0.08);
+    --tmrw-fg: #fcd34d;
+    --tmrw-bg: rgba(245, 158, 11, 0.16);
+    --tmrw-bd: rgba(245, 158, 11, 0.42);
+    --tmrw-wash: rgba(245, 158, 11, 0.08);
 
     --density-panel-bg: linear-gradient(180deg, #0f1a2e 0%, #0d1727 100%);
     --density-panel-bd: #22314c;
@@ -302,6 +331,28 @@ input::placeholder {
   gap: 16px;
   flex: 1;
   min-height: 0;
+}
+
+/* KPI band: a wide "next up" hero + two supporting stats. Collapses gracefully:
+   hero over a 2-up stat row on medium screens, everything stacked on narrow. */
+.kpi-grid {
+  display: grid;
+  gap: 12px;
+  grid-template-columns: 1.85fr 1fr 1fr;
+  align-items: stretch;
+}
+@media (max-width: 900px) {
+  .kpi-grid {
+    grid-template-columns: 1fr 1fr;
+  }
+  .kpi-hero {
+    grid-column: 1 / -1;
+  }
+}
+@media (max-width: 560px) {
+  .kpi-grid {
+    grid-template-columns: 1fr;
+  }
 }
 
 .pane {

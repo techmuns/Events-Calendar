@@ -16,8 +16,9 @@ import {
   UsersIcon,
 } from "./icons";
 import { parseISO } from "../lib/dates";
+import { actionPhrase, proximityOf, toneChip, toneColor, toneSkin } from "../lib/proximity";
 import { downloadEventPdf } from "../lib/pdf";
-import { callMonthToQuarter, lastNQuarters, quarterRank, type Quarter } from "../lib/quarters";
+import { callMonthToQuarter, lastNQuarters, prevQuarterEnd, quarterFromEnd, quarterRank, subtypeNamesQuarter, type Quarter } from "../lib/quarters";
 import { useCompanyFilings } from "../hooks/useCompanyFilings";
 
 const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
@@ -34,6 +35,11 @@ function shortDate(iso: string): string {
 function monthYear(iso: string): string {
   const d = parseISO(iso);
   return `${MONTHS[d.getMonth()]} ${d.getFullYear()}`;
+}
+// Compact "30 Jul" for the last→next result timeline.
+function dayMonth(iso: string): string {
+  const d = parseISO(iso);
+  return `${d.getDate()} ${MONTHS[d.getMonth()]}`;
 }
 // The Indian fiscal quarter a filing falls in (by its own date), for grouping a
 // tab's documents into "Q1 FY27 · Q4 FY26 · …" sections of past quarters.
@@ -327,6 +333,66 @@ function quarterOf(f: CompanyFiling): Quarter | null {
   if (!y || !m) return null;
   return callMonthToQuarter(y, m);
 }
+// The results quarter an event (announced a month or two after close) covers.
+function resultQuarterOf(iso: string): Quarter | null {
+  const [y, m] = iso.split("-").map(Number);
+  if (!y || !m) return null;
+  return callMonthToQuarter(y, m);
+}
+
+// "Last reported → Next" — answers, in one line, when the company last put out
+// results and which quarter is now due. The previous quarter is always derivable
+// from the upcoming one; the date fills in from the most recent earnings call on
+// record (once filings load).
+function ResultTimeline({ event, concalls }: { event: CorporateEvent; concalls: CompanyFiling[] }) {
+  const nextQ = resultQuarterOf(event.date);
+  if (!nextQ) return null;
+  const nextRank = quarterRank(nextQ);
+  let lastCall: CompanyFiling | undefined;
+  for (const f of concalls) {
+    const q = quarterOf(f); // concalls are newest-first
+    if (q && quarterRank(q) < nextRank) {
+      lastCall = f;
+      break;
+    }
+  }
+  const prev = prevQuarterEnd(nextQ.endY, nextQ.endM);
+  const lastQ = lastCall ? quarterOf(lastCall)! : quarterFromEnd(prev.endY, prev.endM);
+  const lastDate = lastCall ? dayMonth(lastCall.date) : null;
+
+  const key: CSSProperties = { fontSize: 9.5, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.04em", color: tokens.textHint };
+  return (
+    <div
+      style={{
+        marginTop: 10,
+        display: "flex",
+        alignItems: "center",
+        gap: 10,
+        background: tokens.surface,
+        border: `1px solid ${tokens.border}`,
+        borderRadius: 12,
+        padding: "9px 13px",
+      }}
+    >
+      <div style={{ minWidth: 0 }}>
+        <div style={key}>Last reported</div>
+        <div style={{ fontSize: 12, fontWeight: 700, color: tokens.textSecondary, whiteSpace: "nowrap" }}>
+          {lastQ.label}
+          {lastDate ? ` · ${lastDate}` : ""}
+        </div>
+      </div>
+      <span style={{ flex: 1 }} />
+      <span style={{ color: tokens.textHint, fontSize: 15, flexShrink: 0 }}>→</span>
+      <span style={{ flex: 1 }} />
+      <div style={{ minWidth: 0, textAlign: "right" }}>
+        <div style={key}>Next</div>
+        <div style={{ fontSize: 12, fontWeight: 700, color: tokens.primaryText, whiteSpace: "nowrap" }}>
+          {nextQ.label} · {dayMonth(event.date)}
+        </div>
+      </div>
+    </div>
+  );
+}
 
 // Quarter-by-quarter earnings-call history: the last eight fiscal quarters,
 // newest first, each either the real call (transcript / audio) or a
@@ -434,6 +500,29 @@ export function EventDetail({
   const byCat: Record<FilingCategory, CompanyFiling[]> = { PRESS: [], MEET: [], PRESENTATION: [], CONCALL: [], SCHEME: [] };
   for (const f of filings) byCat[f.category].push(f);
   const activeCats = CAT_ORDER.filter((c) => byCat[c].length > 0);
+
+  // Imminence: turn the flat "Upcoming event · Results · Monday" line into a live
+  // status ("Reports in 3 days"), a countdown chip and — below — a last→next
+  // result timeline. Skipped for a searched company profile (it has no event).
+  const prox = proximityOf(event.date);
+  const isEarningsLike = event.eventType === "EARNINGS" || event.eventType === "CONCALL";
+  const eventQ = isEarningsLike ? resultQuarterOf(event.date) : null;
+  const upcoming = !isProfile && prox.days >= 0;
+  const statusColor = isProfile ? tokens.textHint : toneColor(prox.tone);
+  const statusLabel = isProfile
+    ? "Company profile"
+    : prox.days < 0
+      ? `Reported ${-prox.days}d ago`
+      : actionPhrase(event.eventType, prox);
+  const showEventQ = eventQ && !subtypeNamesQuarter(event.subtype);
+  const statusMain = isProfile
+    ? "Past filings, calls & investor materials"
+    : `${showEventQ ? `${eventQ!.label} ` : ""}${event.subtype}`;
+  const statusSub = isProfile ? null : `${longDate(event.date)}${event.time ? ` · ${event.time}` : ""}`;
+  const statusSkin = toneSkin(prox.tone);
+  const statusIconColor = upcoming ? statusSkin.fg : typeMeta.hex;
+  const statusIconBg = upcoming ? statusSkin.bg : typeMeta.bg;
+  const statusIconBd = upcoming ? statusSkin.bd : typeMeta.border;
 
   const others = allEvents
     .filter((e) => e.ticker === event.ticker && e.id !== event.id)
@@ -583,7 +672,7 @@ export function EventDetail({
             padding: "10px 12px",
             borderRadius: 12,
             background: tokens.surface,
-            border: `1px solid ${tokens.border}`,
+            border: `1px solid ${upcoming && (prox.tone === "today" || prox.tone === "tomorrow") ? statusSkin.bd : tokens.border}`,
           }}
         >
           <span
@@ -595,23 +684,31 @@ export function EventDetail({
               display: "inline-flex",
               alignItems: "center",
               justifyContent: "center",
-              color: typeMeta.hex,
-              background: typeMeta.bg,
-              border: `1px solid ${typeMeta.border}`,
+              color: statusIconColor,
+              background: statusIconBg,
+              border: `1px solid ${statusIconBd}`,
             }}
           >
             <CalendarIcon size={17} />
           </span>
           <div style={{ flex: 1, minWidth: 0 }}>
-            <div style={{ fontSize: 10, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.05em", color: tokens.textHint }}>
-              {isProfile ? "Company profile" : "Upcoming event"}
+            <div style={{ fontSize: 10, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.05em", color: statusColor }}>
+              {statusLabel}
             </div>
-            <div style={{ fontSize: 13.5, fontWeight: 700, color: tokens.textPrimary, marginTop: 1 }}>
-              {isProfile ? "Past filings, calls & investor materials" : `${event.subtype} · ${longDate(event.date)}`}
-            </div>
+            <div style={{ fontSize: 13.5, fontWeight: 700, color: tokens.textPrimary, marginTop: 1 }}>{statusMain}</div>
+            {statusSub && <div style={{ fontSize: 11.5, color: tokens.textMuted, marginTop: 1 }}>{statusSub}</div>}
           </div>
-          <span style={headerChip}>{event.exchange}</span>
+          <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 5, flexShrink: 0 }}>
+            {upcoming && (
+              <span style={{ fontSize: 11.5, fontWeight: 800, borderRadius: 8, padding: "3px 9px", whiteSpace: "nowrap", ...toneChip(prox.tone) }}>
+                {prox.chip}
+              </span>
+            )}
+            <span style={headerChip}>{event.exchange}</span>
+          </div>
         </div>
+
+        {upcoming && <ResultTimeline event={event} concalls={byCat.CONCALL} />}
 
         <div style={{ display: "flex", gap: 8, marginTop: 12 }}>
           <button

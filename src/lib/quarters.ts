@@ -70,3 +70,9 @@ export function lastNQuarters(topEndY: number, topEndM: 3 | 6 | 9 | 12, n: numbe
 export function quarterRank(q: { endY: number; endM: number }): number {
   return q.endY * 12 + q.endM;
 }
+
+// Whether a subtype already names its fiscal quarter (e.g. "Q1 FY27 Results"),
+// so callers don't prepend a redundant derived quarter label.
+export function subtypeNamesQuarter(subtype: string): boolean {
+  return /\bQ[1-4]\b|\bFY\s?\d/i.test(subtype);
+}
