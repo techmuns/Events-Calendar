@@ -32,6 +32,12 @@ function filingLink(f?: CompanyFiling): string | undefined {
   if (!f) return undefined;
   return f.url ?? f.links?.find((l) => /transcript|rec|audio/i.test(l.label))?.url ?? f.links?.[0]?.url;
 }
+// A real results document (PDF/attachment) vs. a bare NSE/BSE landing page. We
+// only offer a "Results" quick-link when it actually opens the filing — never
+// the company's quote page, which is what an upcoming board meeting links to.
+function isDocUrl(u?: string): u is string {
+  return !!u && !/get-quotes|companies-listing|\/equity\b|\/quotes?\b/i.test(u);
+}
 
 const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
 const BUCKET_ORDER: Bucket[] = ["Recent", "Today", "Tomorrow", "This week", "Next week", "Later"];
@@ -152,19 +158,19 @@ function RowQuickView({ e, accent, onOpen }: { e: CorporateEvent; accent: string
           ))}
         </div>
       ) : (
-        <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
-          <span style={{ fontSize: 10.5, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.05em", color: tokens.textHint, marginRight: 2 }}>
-            This quarter
+        <div style={{ display: "flex", gap: 7, flexWrap: "wrap", alignItems: "center" }}>
+          <span style={{ fontSize: 10, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.05em", color: tokens.textHint, marginRight: 1 }}>
+            Latest filings
           </span>
-          {e.sourceUrl && <QuickChip href={e.sourceUrl} color={accent} Icon={ExternalLinkIcon} label={`Results · ${e.exchange}`} />}
+          {isDocUrl(e.sourceUrl) && <QuickChip href={e.sourceUrl} color={accent} Icon={FileTextIcon} label={`Results · ${e.exchange}`} />}
           {chips.map((c) => (
             <QuickChip key={c.key} href={c.href!} color={filingCategoryMeta[c.key].hex} Icon={c.Icon} label={c.label} />
           ))}
-          {chips.length === 0 && !e.sourceUrl && (
+          {chips.length === 0 && !isDocUrl(e.sourceUrl) && (
             <span style={{ fontSize: 12, color: tokens.textHint }}>No recent filings — open for the company's full history.</span>
           )}
           <button onClick={(ev) => { ev.stopPropagation(); onOpen(); }} style={allBtn}>
-            All quarters & details <ChevronRightIcon size={12} />
+            All quarters &amp; details <ChevronRightIcon size={12} />
           </button>
         </div>
       )}
@@ -295,7 +301,7 @@ function EventRow({
           )}
           {diff?.isRevised && <ChangeBadge kind="moved" />}
         </div>
-        <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 3, fontSize: 12, color: warm ? tokens.textSecondary : tokens.textMuted }}>
+        <div style={{ display: "flex", alignItems: "center", flexWrap: "wrap", gap: 8, marginTop: 3, fontSize: 12, color: warm ? tokens.textSecondary : tokens.textMuted }}>
           {(prox.tone === "today" || prox.tone === "tomorrow" || prox.tone === "soon") && (
             <>
               <span style={{ fontWeight: 700, color: toneColor(prox.tone), whiteSpace: "nowrap" }}>{actionPhrase(e.eventType, prox)}</span>
@@ -320,6 +326,35 @@ function EventRow({
           {diff?.isRevised && diff.prevDate && (
             <span style={{ color: "#f97316", fontWeight: 500, whiteSpace: "nowrap" }}>· was {formatDate(diff.prevDate)}</span>
           )}
+          {/* Filings toggle lives in the body — reachable without hunting for a
+              far-right button. Opens this company's latest press release, call,
+              meet & presentation inline. */}
+          <button
+            onClick={stop(() => setExpanded((v) => !v))}
+            title={expanded ? "Hide filings" : "Show this company's press release, call, meet & presentation"}
+            style={{
+              display: "inline-flex",
+              alignItems: "center",
+              gap: 4,
+              cursor: "pointer",
+              fontSize: 11,
+              fontWeight: 700,
+              lineHeight: 1,
+              padding: "3px 9px",
+              borderRadius: 999,
+              color: accent,
+              border: `1px solid color-mix(in srgb, ${accent} ${expanded ? 46 : 28}%, transparent)`,
+              background: `color-mix(in srgb, ${accent} ${expanded ? 14 : 7}%, ${tokens.surface})`,
+              whiteSpace: "nowrap",
+              flexShrink: 0,
+              transition: "background 160ms ease, border-color 160ms ease",
+            }}
+          >
+            Filings
+            <span style={{ display: "inline-flex", transform: expanded ? "rotate(180deg)" : "none", transition: "transform 160ms ease" }}>
+              <ChevronDownIcon size={12} />
+            </span>
+          </button>
         </div>
       </div>
       <div style={{ display: "flex", alignItems: "center", gap: 8, flexShrink: 0 }}>
@@ -343,35 +378,6 @@ function EventRow({
             <span style={{ width: 6, height: 6, borderRadius: "50%", background: "#10b981" }} /> New
           </span>
         )}
-        <button
-          onClick={stop(() => setExpanded((v) => !v))}
-          title={expanded ? "Hide this quarter's materials" : "This quarter's press release, call, meet & presentation"}
-          style={{
-            display: "inline-flex",
-            alignItems: "center",
-            gap: 5,
-            cursor: "pointer",
-            height: 30,
-            padding: "0 10px",
-            borderRadius: 8,
-            fontSize: 12,
-            fontWeight: 600,
-            color: expanded || warm ? accent : tokens.textSecondary,
-            border: `1px solid ${expanded || warm ? `color-mix(in srgb, ${accent} 40%, transparent)` : tokens.border}`,
-            background: expanded
-              ? `color-mix(in srgb, ${accent} 13%, ${tokens.surface})`
-              : warm
-                ? `color-mix(in srgb, ${accent} 10%, ${tokens.surface})`
-                : tokens.surface,
-            flexShrink: 0,
-            transition: "color 160ms ease, border-color 160ms ease, background 160ms ease",
-          }}
-        >
-          This quarter
-          <span style={{ display: "inline-flex", transform: expanded ? "rotate(180deg)" : "none", transition: "transform 160ms ease" }}>
-            <ChevronDownIcon size={13} />
-          </span>
-        </button>
         {e.sourceUrl && (
           <a
             href={e.sourceUrl}

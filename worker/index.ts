@@ -394,6 +394,18 @@ function parseNseRecentResults(data: unknown): CorporateEvent[] {
   const seen = new Set<string>();
   for (const r of data as Array<Record<string, string>>) {
     const desc = (r.desc ?? "").toLowerCase();
+    // A presentation, a con-call / analyst-meet intimation, a notice, a newspaper
+    // ad or an advance schedule is NOT the results being declared — it must never
+    // create a "reported" row (that's what surfaced a deck as an 11-Aug result
+    // when the actual board meeting was days later). Skip those categories.
+    if (/presentation|analyst|investor meet|con\.? ?call|intimation|notice|newspaper|advertisement|record date|schedule of|prior intimation|advance/.test(desc)) continue;
+    let fname = "";
+    try {
+      fname = decodeURIComponent(r.attchmntFile ?? "").toLowerCase();
+    } catch {
+      fname = (r.attchmntFile ?? "").toLowerCase();
+    }
+    if (/presentation|\bppt\b|investor[\s-]?deck/.test(fname)) continue;
     const text = (r.attchmntText ?? "").toLowerCase();
     const blob = `${desc} ${text}`;
     // Genuine quarterly/annual results outcomes only (not dividends, ratings…).
@@ -433,14 +445,25 @@ function anyDate(s: string): string | null {
   return isoDate(s ?? "");
 }
 
-function categorizeFiling(desc: string, text: string): FilingCategory | null {
+function categorizeFiling(desc: string, text: string, url = ""): FilingCategory | null {
   const d = (desc ?? "").toLowerCase();
   const t = (text ?? "").toLowerCase();
+  let fname = "";
+  try {
+    fname = decodeURIComponent(url ?? "").toLowerCase();
+  } catch {
+    fname = (url ?? "").toLowerCase();
+  }
   const s = `${d} ${t}`;
+  const sf = `${s} ${fname}`; // include the attachment filename in the signal
   if (/scheme of arrangement|scheme of amalgamation|amalgamat|de-?merg|spin-?off|composite scheme|hive-?off|slump sale/.test(s)) return "SCHEME";
-  if (/presentation/.test(s)) return "PRESENTATION";
+  // Investor/results presentation. Companies routinely file the deck under a bare
+  // "Con. Call" intimation, so the body says "call" while the *attachment* is the
+  // presentation — the filename ("… Investor presentation …") is the giveaway.
+  // Checking it here keeps a deck out of the earnings-call bucket.
+  if (/presentation|\bppt\b|investor[\s-]?deck/.test(sf)) return "PRESENTATION";
   // NSE bundles meets + calls under one `desc`; trust the body to spot a call.
-  if (/con\.? ?call|conference call|earnings call|analyst call|investor call|dial-?in|audio call|webcast/.test(t))
+  if (/con\.? ?call|conference call|earnings call|earnings conference|analyst call|investor call|dial-?in|audio call|webcast/.test(t))
     return "CONCALL";
   if (/investor meet|analyst|institutional investor|con\.? ?call|investor call/.test(s)) return "MEET";
   if (/press release|media release|press note/.test(s)) return "PRESS";
@@ -614,9 +637,9 @@ function parseCompanyFilings(data: unknown): CompanyFiling[] {
   const out: CompanyFiling[] = [];
   const seen = new Set<string>();
   for (const r of data as Array<Record<string, string>>) {
-    const cat = categorizeFiling(r.desc ?? "", r.attchmntText ?? "");
-    if (!cat) continue;
     const url = (r.attchmntFile ?? "").trim();
+    const cat = categorizeFiling(r.desc ?? "", r.attchmntText ?? "", url);
+    if (!cat) continue;
     if (!url || seen.has(url)) continue;
     const date = anyDate(r.an_dt) ?? anyDate(r.sort_date ?? "");
     if (!date) continue;
