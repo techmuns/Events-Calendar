@@ -15,7 +15,7 @@ import {
   StarIcon,
   UsersIcon,
 } from "./icons";
-import { parseISO } from "../lib/dates";
+import { diffDays, parseISO, todayStart } from "../lib/dates";
 import { actionPhrase, proximityOf, toneChip, toneColor, toneSkin } from "../lib/proximity";
 import { downloadEventPdf } from "../lib/pdf";
 import { callMonthToQuarter, lastNQuarters, prevQuarterEnd, quarterFromEnd, quarterRank, subtypeNamesQuarter, type Quarter } from "../lib/quarters";
@@ -394,30 +394,77 @@ function ResultTimeline({ event, concalls }: { event: CorporateEvent; concalls: 
   );
 }
 
+// A call that's still ahead (freshly-intimated) — shown on its own, above the
+// historical grid, so a scheduled call is never mistaken for a completed one.
+function UpcomingConcallCard({ f }: { f: CompanyFiling }) {
+  const m = filingCategoryMeta.CONCALL;
+  const link = f.url ?? f.links?.[0]?.url;
+  return (
+    <div
+      style={{
+        border: `1px solid ${m.border}`,
+        borderLeft: `3px solid ${m.hex}`,
+        borderRadius: 13,
+        padding: 12,
+        background: m.bg,
+        boxShadow: tokens.shadowCard,
+      }}
+    >
+      <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+        <span style={{ flexShrink: 0, width: 38, height: 38, borderRadius: 10, display: "inline-flex", alignItems: "center", justifyContent: "center", color: m.hex, background: tokens.surface, border: `1px solid ${m.border}` }}>
+          <MicIcon size={18} />
+        </span>
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 7, flexWrap: "wrap" }}>
+            <span style={{ fontSize: 13.5, fontWeight: 800, color: tokens.textPrimary, letterSpacing: "-0.01em" }}>Upcoming earnings call</span>
+            <span style={{ fontSize: 9.5, fontWeight: 800, letterSpacing: "0.04em", color: m.hex, background: tokens.surface, border: `1px solid ${m.border}`, borderRadius: 6, padding: "1px 6px" }}>SCHEDULED</span>
+          </div>
+          <div style={{ fontSize: 11.5, color: tokens.textMuted, marginTop: 3 }}>
+            Announced {shortDate(f.date)} · exact date &amp; time are in the intimation
+          </div>
+        </div>
+        {link && <LinkAction label="Intimation" url={link} />}
+      </div>
+    </div>
+  );
+}
+
 // Quarter-by-quarter earnings-call history: the last eight fiscal quarters,
 // newest first, each either the real call (transcript / audio) or a
-// "Concall not available" placeholder so skipped quarters are explicit.
+// "Concall not available" placeholder so skipped quarters are explicit. A call
+// that's still ahead (intimation filed in the last couple of days) is lifted out
+// into its own "Upcoming" card so it isn't shown as a completed quarter.
 function ConcallHistory({ concalls, accent }: { concalls: CompanyFiling[]; accent: string }) {
-  const now = new Date();
+  const today = todayStart();
+  const newest = concalls[0]; // filings are newest-first
+  const newestAge = newest ? diffDays(parseISO(newest.date), today) : 999;
+  const upcoming = newest && newestAge >= 0 && newestAge <= 2 ? newest : null;
+  const history = upcoming ? concalls.slice(1) : concalls;
+
   const byQuarter = new Map<string, CompanyFiling>();
   // Anchor the top to the newest of {this quarter, latest call on record} so a
   // company that hasn't reported the current quarter still shows the gap; anchor
   // the bottom to the *earliest* call on record so we don't pad the list with
-  // "not available" for quarters before the company ever held a call.
-  const currentQ = callMonthToQuarter(now.getFullYear(), now.getMonth() + 1);
-  let top = currentQ;
-  let earliest = currentQ;
-  for (const f of concalls) {
+  // "not available" for quarters before the company ever held a call. When an
+  // upcoming call is broken out, the grid represents strictly past quarters.
+  const currentQ = callMonthToQuarter(today.getFullYear(), today.getMonth() + 1);
+  let top: Quarter | null = upcoming ? null : currentQ;
+  let earliest: Quarter | null = upcoming ? null : currentQ;
+  for (const f of history) {
     const q = quarterOf(f);
     if (!q) continue;
     if (!byQuarter.has(q.key)) byQuarter.set(q.key, f);
-    if (quarterRank(q) > quarterRank(top)) top = q;
-    if (quarterRank(q) < quarterRank(earliest)) earliest = q;
+    if (top === null || quarterRank(q) > quarterRank(top)) top = q;
+    if (earliest === null || quarterRank(q) < quarterRank(earliest)) earliest = q;
   }
-  const n = Math.min(8, Math.max(1, quarterRank(top) - quarterRank(earliest) + 1));
-  const grid = lastNQuarters(top.endY, top.endM, n);
+  const grid = top && earliest ? lastNQuarters(top.endY, top.endM, Math.min(8, Math.max(1, quarterRank(top) - quarterRank(earliest) + 1))) : [];
+
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 9 }}>
+      {upcoming && <UpcomingConcallCard f={upcoming} />}
+      {upcoming && grid.length > 0 && (
+        <div style={{ fontSize: 10.5, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.05em", color: tokens.textHint, marginTop: 2 }}>Earlier calls</div>
+      )}
       {grid.map((q) => {
         const f = byQuarter.get(q.key);
         if (f) return <ConcallCard key={q.key} f={f} q={q} accent={accent} />;
@@ -425,6 +472,7 @@ function ConcallHistory({ concalls, accent }: { concalls: CompanyFiling[]; accen
         // yet held, not one the company skipped.
         return <ConcallMissing key={q.key} q={q} awaited={quarterRank(q) >= quarterRank(currentQ)} />;
       })}
+      {upcoming && grid.length === 0 && <div style={{ fontSize: 12, color: tokens.textHint }}>No earlier earnings calls on record.</div>}
       <div style={{ fontSize: 11, color: tokens.textHint, marginTop: 3, lineHeight: 1.5 }}>
         Earnings-call transcripts &amp; audio are sourced from Screener. Quarters with no published call show as unavailable — small companies often hold calls only occasionally.
       </div>

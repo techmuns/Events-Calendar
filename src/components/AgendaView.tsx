@@ -19,6 +19,7 @@ import {
 import { type Bucket, bucketFor, formatDate, parseISO, todayStart } from "../lib/dates";
 import { actionPhrase, proximityOf, type Tone, toneColor, toneSkin } from "../lib/proximity";
 import { useCompanyFilings } from "../hooks/useCompanyFilings";
+import { usePersistedOpen } from "../hooks/usePersistedOpen";
 
 type IconCmp = (p: { size?: number }) => JSX.Element;
 // The current-quarter document types we surface as one-click links on a row.
@@ -424,37 +425,63 @@ export function AgendaView({
     return <EmptyState message="No events match these filters" hint="Try widening the horizon or switching the universe to All." />;
   }
   const today = todayStart();
+  // Already-reported events are collapsed by default so opening the dashboard
+  // leads with today & what's ahead — not results from a couple of days ago.
+  const [recentOpen, setRecentOpen] = usePersistedOpen("ec_recent_open", false);
   const groups: Record<Bucket, CorporateEvent[]> = { Recent: [], Today: [], Tomorrow: [], "This week": [], "Next week": [], Later: [] };
   for (const e of events) groups[bucketFor(e.date, today)].push(e);
 
   return (
     <div>
-      {BUCKET_ORDER.filter((b) => groups[b].length > 0).map((b) => (
-        <div key={b}>
-          <div
-            style={{
-              position: "sticky",
-              top: 0,
-              zIndex: 1,
-              padding: "7px 16px",
-              background: tokens.bucketBg,
-              backdropFilter: "blur(6px)",
-              fontSize: 10.5,
-              fontWeight: 700,
-              textTransform: "uppercase",
-              letterSpacing: "0.06em",
-              color: b === "Recent" ? tokens.textMuted : tokens.primaryText,
-              borderBottom: `1px solid ${tokens.border}`,
-            }}
-          >
-            {b === "Recent" ? "Recently reported" : b}
-            <span style={{ color: tokens.textHint, fontWeight: 600 }}> · {groups[b].length}</span>
+      {BUCKET_ORDER.filter((b) => groups[b].length > 0).map((b) => {
+        const isRecent = b === "Recent";
+        const collapsed = isRecent && !recentOpen;
+        return (
+          <div key={b}>
+            <div
+              onClick={isRecent ? () => setRecentOpen(!recentOpen) : undefined}
+              style={{
+                position: "sticky",
+                top: 0,
+                zIndex: 1,
+                display: "flex",
+                alignItems: "center",
+                padding: "7px 16px",
+                background: tokens.bucketBg,
+                backdropFilter: "blur(6px)",
+                fontSize: 10.5,
+                fontWeight: 700,
+                textTransform: "uppercase",
+                letterSpacing: "0.06em",
+                color: isRecent ? tokens.textMuted : tokens.primaryText,
+                borderBottom: `1px solid ${tokens.border}`,
+                cursor: isRecent ? "pointer" : "default",
+              }}
+            >
+              <span>
+                {isRecent ? "Recently reported" : b}
+                <span style={{ color: tokens.textHint, fontWeight: 600 }}> · {groups[b].length}</span>
+              </span>
+              {isRecent && (
+                <span
+                  style={{
+                    marginLeft: "auto",
+                    display: "inline-flex",
+                    transform: collapsed ? "none" : "rotate(180deg)",
+                    transition: "transform 160ms ease",
+                  }}
+                >
+                  <ChevronDownIcon size={13} />
+                </span>
+              )}
+            </div>
+            {!collapsed &&
+              groups[b].map((e) => (
+                <EventRow key={e.id} e={e} diff={diffs?.get(e.id)} selected={selectedId === e.id} isDark={isDark} isRecent={isRecent} {...handlers} />
+              ))}
           </div>
-          {groups[b].map((e) => (
-            <EventRow key={e.id} e={e} diff={diffs?.get(e.id)} selected={selectedId === e.id} isDark={isDark} isRecent={b === "Recent"} {...handlers} />
-          ))}
-        </div>
-      ))}
+        );
+      })}
     </div>
   );
 }

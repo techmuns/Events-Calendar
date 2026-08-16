@@ -1,12 +1,19 @@
 import type { CSSProperties } from "react";
 import type { CorporateEvent } from "../types";
 import { tokens } from "../theme";
-import { bucketFor, todayStart } from "../lib/dates";
+import { bucketFor, diffDays, formatDate, parseISO, todayStart } from "../lib/dates";
 import { proximityOf, toneChip, toneColor, toneSkin } from "../lib/proximity";
 import { callMonthToQuarter, subtypeNamesQuarter } from "../lib/quarters";
 import { BuildingIcon, CalendarIcon, LayersIcon } from "./icons";
 
 type IconCmp = (p: { size?: number }) => JSX.Element;
+
+const MON = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+// Compact "13 Aug" for a done event's date chip.
+function dayMon(iso: string): string {
+  const d = parseISO(iso);
+  return `${d.getDate()} ${MON[d.getMonth()]}`;
+}
 
 // Results-quarter a report/call covers (announced a month or two after close).
 function quarterLabel(iso: string): string | null {
@@ -60,16 +67,33 @@ function NextUpHero({ next, onSelect }: { next?: CorporateEvent; onSelect?: (e: 
   const prox = proximityOf(next.date, today);
   const skin = toneSkin(prox.tone);
   const fg = toneColor(prox.tone);
-  const when = prox.days === 0 ? "today" : prox.days === 1 ? "tomorrow" : `in ${prox.days} days`;
-  const sentence =
-    next.eventType === "EARNINGS"
-      ? `${next.company} reports ${when}`
-      : next.eventType === "CONCALL"
-        ? `${next.company}’s earnings call ${when}`
-        : next.company;
   const isEarningsLike = next.eventType === "EARNINGS" || next.eventType === "CONCALL";
   const q = isEarningsLike && !subtypeNamesQuarter(next.subtype) ? quarterLabel(next.date) : null;
-  const sub = [q, next.subtype].filter(Boolean).join(" ") + (next.time ? ` · ${next.time}` : "");
+
+  // A done event never reads as "reports in -4 days" — it states the company and
+  // the date it actually took place. Upcoming events keep the countdown phrasing.
+  let label: string;
+  let sentence: string;
+  let sub: string;
+  let chipText: string;
+  if (prox.days < 0) {
+    const detail = [q, next.subtype].filter(Boolean).join(" ");
+    label = "Recently reported";
+    sentence = next.company;
+    sub = `Reported ${formatDate(next.date)}` + (detail ? ` · ${detail}` : "");
+    chipText = dayMon(next.date);
+  } else {
+    const when = prox.days === 0 ? "today" : prox.days === 1 ? "tomorrow" : `in ${prox.days} days`;
+    label = "Next up";
+    sentence =
+      next.eventType === "EARNINGS"
+        ? `${next.company} reports ${when}`
+        : next.eventType === "CONCALL"
+          ? `${next.company}’s earnings call ${when}`
+          : next.company;
+    sub = [q, next.subtype].filter(Boolean).join(" ") + (next.time ? ` · ${next.time}` : "");
+    chipText = prox.chip;
+  }
 
   return (
     <button
@@ -88,7 +112,7 @@ function NextUpHero({ next, onSelect }: { next?: CorporateEvent; onSelect?: (e: 
         <CalendarIcon size={20} />
       </span>
       <div style={{ minWidth: 0, flex: 1 }}>
-        <div style={eyebrow(fg)}>Next up</div>
+        <div style={eyebrow(fg)}>{label}</div>
         <div
           style={{
             fontSize: 16.5,
@@ -121,7 +145,7 @@ function NextUpHero({ next, onSelect }: { next?: CorporateEvent; onSelect?: (e: 
           ...toneChip(prox.tone),
         }}
       >
-        {prox.chip}
+        {chipText}
       </span>
     </button>
   );
@@ -213,7 +237,11 @@ function KpiCard({
 
 export function KpiRow({ events, onSelect }: { events: CorporateEvent[]; onSelect?: (e: CorporateEvent) => void }) {
   const today = todayStart();
-  const next = events[0];
+  // Prefer the soonest genuinely-upcoming event for the hero. Only if the view
+  // holds nothing ahead (e.g. a past custom range) do we fall back to the most
+  // recent one — shown as "recently reported", never a negative countdown.
+  const upcoming = events.filter((e) => diffDays(today, parseISO(e.date)) >= 0);
+  const next = upcoming[0] ?? events[events.length - 1];
   const thisWeek = events.filter((e) => {
     const b = bucketFor(e.date, today);
     return b === "Today" || b === "Tomorrow" || b === "This week";
