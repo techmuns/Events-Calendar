@@ -668,12 +668,14 @@ function latestResultsDoc(data: unknown): string | undefined {
     } catch {
       fname = url.toLowerCase();
     }
-    if (/presentation|\bppt\b|investor[\s-]?deck/.test(fname)) continue;
+    if (/presentation|\bppt\b|investor[\s-]?deck|query|clarification|reply|response|corrigendum|newspaper/.test(fname)) continue;
     const desc = (r.desc ?? "").toLowerCase();
-    if (/presentation|analyst|investor meet|con\.? ?call|intimation|notice|newspaper|advertisement|record date|schedule of|prior intimation|advance/.test(desc)) continue;
+    if (/presentation|analyst|investor meet|con\.? ?call|intimation|notice|newspaper|advertisement|record date|schedule of|prior intimation|advance|query|clarification|reply|response to|corrigendum|withdrawal/.test(desc)) continue;
     const blob = `${desc} ${(r.attchmntText ?? "").toLowerCase()}`;
+    // Match the results *category* (desc), not stray "financial results" mentions
+    // in a query reply's body — plus board-meeting outcomes that declare results.
     const isResults =
-      /financial results?|quarterly results?|(?:un)?audited (?:standalone|consolidated|financial)/.test(blob) ||
+      /financial results?|(?:un)?audited (?:standalone|consolidated|financial)|statement of (?:standalone|consolidated)/.test(desc) ||
       (/outcome of (?:the )?board meeting/.test(desc) && /\bresults?\b/.test(blob));
     if (!isResults) continue;
     const date = anyDate(r.an_dt) ?? anyDate(r.sort_date ?? "");
