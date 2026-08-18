@@ -208,6 +208,50 @@ function parseBseForthResults(data: unknown): CorporateEvent[] {
   return out;
 }
 
+function bseCompactDate(d: Date): string {
+  return `${d.getFullYear()}${String(d.getMonth() + 1).padStart(2, "0")}${String(d.getDate()).padStart(2, "0")}`;
+}
+
+// Just-reported results from BSE's announcements (category "Result"), so BSE-only
+// companies that reported also surface — and, crucially, each carries the *actual
+// results PDF* (never a quote page). Complements the NSE recent-results feed.
+function parseBseRecentResults(data: unknown): CorporateEvent[] {
+  const rows = (data as { Table?: unknown } | null)?.Table;
+  if (!Array.isArray(rows)) return [];
+  const out: CorporateEvent[] = [];
+  const seen = new Set<string>();
+  for (const r of rows as Array<Record<string, string>>) {
+    const att = (r.ATTACHMENTNAME ?? "").trim();
+    if (!att || !/\.pdf$/i.test(att)) continue;
+    const blob = `${r.CATEGORYNAME ?? ""} ${r.SUBCATNAME ?? ""} ${r.NEWSSUB ?? ""}`.toLowerCase();
+    // The feed is already the Result category, but guard against a stray
+    // presentation/intimation that isn't the results themselves.
+    if (/presentation|investor meet|con\.? ?call|analyst meet|newspaper/.test(blob) && !/financial result|outcome of board|audited/.test(blob)) continue;
+    const date = anyDate(r.NEWS_DT ?? r.DT_TM ?? "");
+    if (!date) continue;
+    const code = String(r.SCRIP_CD ?? "").trim();
+    const m = /\/([a-z0-9]+)\/\d+\/?$/i.exec(r.NSURL ?? "");
+    const ticker = (m ? m[1] : code).toUpperCase();
+    const key = code || ticker;
+    if (!key || seen.has(key)) continue;
+    seen.add(key);
+    out.push({
+      id: `BSE_RES_${key}_${date}`,
+      company: cleanName(r.SLONGNAME || ticker),
+      ticker,
+      eventType: "EARNINGS",
+      subtype: "Results",
+      date,
+      status: "CONFIRMED",
+      exchange: "BSE",
+      sourceUrl: `https://www.bseindia.com/xml-data/corpfiling/AttachLive/${att}`,
+      indices: indicesFor(ticker),
+      sector: "",
+    });
+  }
+  return out.slice(0, 150);
+}
+
 // NSE board meetings called to consider financial results.
 function parseBoardMeetings(data: unknown): CorporateEvent[] {
   if (!Array.isArray(data)) return [];
@@ -910,7 +954,7 @@ async function buildLiveResult() {
   const bmTo = new Date(now);
   bmTo.setDate(bmTo.getDate() + 120);
 
-  const [constituents, settled, annRaw] = await Promise.all([
+  const [constituents, settled, annRaw, bseRecent] = await Promise.all([
     fetchConstituents().catch(() => new Map<string, Constituent>()),
     Promise.allSettled([
       retry(() => bseJson("/Corpforthresults/w")).then(parseBseForthResults),
@@ -934,6 +978,19 @@ async function buildLiveResult() {
       `${NSE}/companies-listing/corporate-filings-announcements`,
       cookie,
     ).catch(() => null),
+    // BSE just-reported results (a few pages) — surfaces BSE-only reporters and
+    // gives every one its actual results PDF.
+    Promise.all(
+      [1, 2, 3].map((page) =>
+        retry(() =>
+          bseJson(
+            `/AnnSubCategoryGetData/w?pageno=${page}&strCat=Result&strPrevDate=${bseCompactDate(recentFrom)}&strScrip=&strSearch=P&strToDate=${bseCompactDate(now)}&strType=C&subcategory=-1`,
+          ),
+        )
+          .then(parseBseRecentResults)
+          .catch(() => [] as CorporateEvent[]),
+      ),
+    ).then((pages) => pages.flat()),
   ]);
 
   // The announcements feed drives both the concall list and just-reported results.
@@ -950,6 +1007,10 @@ async function buildLiveResult() {
     }
   });
   all.push(...recentResults);
+  // BSE reported results last: a company with an upcoming meeting or an NSE
+  // record keeps that (dedupe is first-wins); a BSE-only reporter is added fresh.
+  all.push(...bseRecent);
+  if (bseRecent.length) sources.bse = true;
   if (concalls.length || recentResults.length) sources.nse = true;
 
   const enriched = all.map((e) => enrichEvent(e, constituents));
