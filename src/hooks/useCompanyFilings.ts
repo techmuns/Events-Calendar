@@ -5,6 +5,7 @@ import { getCompanyFilings } from "../data/provider";
 interface State {
   filings: CompanyFiling[];
   source: string; // provenance label, e.g. "BSE · NSE · Screener"
+  resultsUrl?: string; // the company's latest actual results document (PDF)
   loading: boolean;
   error: boolean;
 }
@@ -24,7 +25,7 @@ export function useCompanyFilings(ticker: string | null, name = ""): State {
     setState({ filings: [], source: "", loading: true, error: false });
     getCompanyFilings(ticker ?? "", name)
       .then((r) => {
-        if (!cancelled) setState({ filings: r.filings, source: r.source ?? "", loading: false, error: r.ok === false });
+        if (!cancelled) setState({ filings: r.filings, source: r.source ?? "", resultsUrl: r.resultsUrl, loading: false, error: r.ok === false });
       })
       .catch(() => {
         if (!cancelled) setState({ filings: [], source: "", loading: false, error: true });

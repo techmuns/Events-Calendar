@@ -31,13 +31,22 @@ const QV_CATS: { key: FilingCategory; label: string; Icon: IconCmp }[] = [
 ];
 function filingLink(f?: CompanyFiling): string | undefined {
   if (!f) return undefined;
+  const isDeck = (s?: string) => /presentation|\bppt\b|slide|deck/i.test(s || "");
+  // An earnings call must never resolve to a slide deck / presentation — if the
+  // only material is a deck, return nothing so the chip is hidden.
+  if (f.category === "CONCALL") {
+    if (f.url && !isDeck(f.url)) return f.url;
+    return (f.links ?? []).find((l) => /transcript|rec|audio/i.test(l.label) && !isDeck(l.url))?.url;
+  }
   return f.url ?? f.links?.find((l) => /transcript|rec|audio/i.test(l.label))?.url ?? f.links?.[0]?.url;
 }
-// A real results document (PDF/attachment) vs. a bare NSE/BSE landing page. We
-// only offer a "Results" quick-link when it actually opens the filing — never
-// the company's quote page, which is what an upcoming board meeting links to.
+// Only a genuine results document (a PDF / XBRL attachment) counts — never an
+// exchange quote or landing page. NSE board-meetings and BSE forthcoming-results
+// events carry a quote-page URL, and results that aren't out yet have no document
+// at all; in both cases the "Results" quick-link is hidden rather than sending a
+// client to the wrong page.
 function isDocUrl(u?: string): u is string {
-  return !!u && !/get-quotes|companies-listing|\/equity\b|\/quotes?\b/i.test(u);
+  return !!u && (/\.(pdf|xml|xlsx?|zip)(?:$|[?#])/i.test(u) || /nsearchives|xml-data\/corpfiling|attachlive|\/attach/i.test(u));
 }
 
 const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
@@ -130,10 +139,13 @@ function QuickChip({ href, color, Icon, label }: { href: string; color: string; 
 // row is expanded, then offers direct links to the current results, press
 // release, earnings call, investor meet and presentation.
 function RowQuickView({ e, accent, onOpen }: { e: CorporateEvent; accent: string; onOpen: () => void }) {
-  const { filings, loading } = useCompanyFilings(e.ticker, e.company);
+  const { filings, resultsUrl, loading } = useCompanyFilings(e.ticker, e.company);
   const latest = new Map<FilingCategory, CompanyFiling>();
   for (const f of filings) if (!latest.has(f.category)) latest.set(f.category, f); // filings are newest-first
   const chips = QV_CATS.map((c) => ({ ...c, href: filingLink(latest.get(c.key)) })).filter((c) => c.href);
+  // The company's actual results document, if one exists — prefer it over the
+  // event's own link, and never fall back to a bare quote/landing page.
+  const resultsHref = resultsUrl ?? (isDocUrl(e.sourceUrl) ? e.sourceUrl : undefined);
 
   const allBtn: CSSProperties = {
     display: "inline-flex",
@@ -163,12 +175,12 @@ function RowQuickView({ e, accent, onOpen }: { e: CorporateEvent; accent: string
           <span style={{ fontSize: 10, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.05em", color: tokens.textHint, marginRight: 1 }}>
             Latest filings
           </span>
-          {isDocUrl(e.sourceUrl) && <QuickChip href={e.sourceUrl} color={accent} Icon={FileTextIcon} label={`Results · ${e.exchange}`} />}
+          {resultsHref && <QuickChip href={resultsHref} color={accent} Icon={FileTextIcon} label="Results" />}
           {chips.map((c) => (
             <QuickChip key={c.key} href={c.href!} color={filingCategoryMeta[c.key].hex} Icon={c.Icon} label={c.label} />
           ))}
-          {chips.length === 0 && !isDocUrl(e.sourceUrl) && (
-            <span style={{ fontSize: 12, color: tokens.textHint }}>No recent filings — open for the company's full history.</span>
+          {chips.length === 0 && !resultsHref && (
+            <span style={{ fontSize: 12, color: tokens.textHint }}>No results document published yet — open for the company's full history.</span>
           )}
           <button onClick={(ev) => { ev.stopPropagation(); onOpen(); }} style={allBtn}>
             All quarters &amp; details <ChevronRightIcon size={12} />

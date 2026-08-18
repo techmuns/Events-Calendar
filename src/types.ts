@@ -85,6 +85,7 @@ export interface CompanyFilingsResult {
   generatedAt: string;
   source: string; // provenance label, e.g. "BSE · NSE · Screener"
   ok?: boolean; // false when every source failed (vs. genuinely no filings)
+  resultsUrl?: string; // the company's latest actual results document (PDF), if any
 }
 
 // ---- Filter state shared across the dashboard ----

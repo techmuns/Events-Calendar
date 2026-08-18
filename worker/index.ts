@@ -652,7 +652,38 @@ function parseCompanyFilings(data: unknown): CompanyFiling[] {
 
 // NSE announcements for one symbol → categorised filings. NSE intermittently
 // blocks bursts (erroring, or an empty 200), so retry with a fresh cookie.
-async function fetchNseFilings(sym: string): Promise<{ filings: CompanyFiling[]; reached: boolean }> {
+// The company's most recent *actual results document* (a PDF) from its NSE
+// announcements — the file a client wants when they click "Results". Presentations,
+// intimations, notices and non-PDF attachments are excluded, so this is never a
+// deck or a quote page.
+function latestResultsDoc(data: unknown): string | undefined {
+  if (!Array.isArray(data)) return undefined;
+  let best: { date: string; url: string } | undefined;
+  for (const r of data as Array<Record<string, string>>) {
+    const url = (r.attchmntFile ?? "").trim();
+    if (!url || !/\.pdf($|\?)/i.test(url)) continue;
+    let fname = "";
+    try {
+      fname = decodeURIComponent(url).toLowerCase();
+    } catch {
+      fname = url.toLowerCase();
+    }
+    if (/presentation|\bppt\b|investor[\s-]?deck/.test(fname)) continue;
+    const desc = (r.desc ?? "").toLowerCase();
+    if (/presentation|analyst|investor meet|con\.? ?call|intimation|notice|newspaper|advertisement|record date|schedule of|prior intimation|advance/.test(desc)) continue;
+    const blob = `${desc} ${(r.attchmntText ?? "").toLowerCase()}`;
+    const isResults =
+      /financial results?|quarterly results?|(?:un)?audited (?:standalone|consolidated|financial)/.test(blob) ||
+      (/outcome of (?:the )?board meeting/.test(desc) && /\bresults?\b/.test(blob));
+    if (!isResults) continue;
+    const date = anyDate(r.an_dt) ?? anyDate(r.sort_date ?? "");
+    if (!date) continue;
+    if (!best || date > best.date) best = { date, url };
+  }
+  return best?.url;
+}
+
+async function fetchNseFilings(sym: string): Promise<{ filings: CompanyFiling[]; reached: boolean; resultsUrl?: string }> {
   const now = new Date();
   const from = new Date(now);
   // ~15 months back so the details tabs carry several past quarters of press
@@ -664,17 +695,19 @@ async function fetchNseFilings(sym: string): Promise<{ filings: CompanyFiling[];
   const referer = `${NSE}/get-quotes/equity?symbol=${encodeURIComponent(sym)}`;
   let filings: CompanyFiling[] = [];
   let reached = false;
+  let resultsUrl: string | undefined;
   for (let attempt = 0; attempt < 3 && filings.length === 0; attempt++) {
     try {
       const cookie = await nseCookie();
       const data = await nseJson(path, referer, cookie);
       reached = true;
       filings = parseCompanyFilings(data);
+      resultsUrl = latestResultsDoc(data);
     } catch {
       /* transient — try again with a fresh cookie */
     }
   }
-  return { filings, reached };
+  return { filings, reached, resultsUrl };
 }
 
 // ---- Screener.in --------------------------------------------------------------
@@ -792,11 +825,16 @@ function parseScreenerConcalls(html: string): CompanyFiling[] {
       if (href && lbl) links.push({ label: lbl, url: href, source: hostSource(href) });
     }
     if (!links.length) continue;
-    const primary =
-      links.find((l) => /transcript/i.test(l.label)) ?? links.find((l) => /ppt/i.test(l.label)) ?? links[0];
-    // Credit Screener as the aggregator that surfaced the concall; the individual
-    // links keep their real host (BSE/NSE/company) for provenance.
-    out.push({ category: "CONCALL", title: `Earnings Call · ${label}`, date: iso, links, url: primary.url, source: "Screener" });
+    // A genuine earnings call has a transcript or an audio recording. Screener
+    // also lists rows that only carry a PPT or an intimation — those are decks /
+    // notices, not the call itself, so we skip them entirely rather than surface
+    // a presentation under "Earnings Call".
+    const call = links.find((l) => /transcript|recording|\brec\b|audio/i.test(l.label));
+    if (!call) continue;
+    // Keep only real call materials (never the slide deck) so nothing downstream
+    // can resolve the call to a presentation.
+    const callLinks = links.filter((l) => !/ppt|slide|deck|presentation/i.test(l.label) && !/presentation/i.test(l.url));
+    out.push({ category: "CONCALL", title: `Earnings Call · ${label}`, date: iso, links: callLinks, url: call.url, source: "Screener" });
   }
   return out.slice(0, 12);
 }
@@ -816,9 +854,11 @@ async function buildCompanyFilings(name: string, symbol: string) {
 
   // 2. NSE announcements via the canonical symbol (fixes BSE short-name misses).
   let reached = false;
+  let resultsUrl: string | undefined;
   if (canonical && /[A-Za-z]/.test(canonical)) {
     const nse = await fetchNseFilings(canonical);
     reached = nse.reached;
+    resultsUrl = nse.resultsUrl;
     // Screener already supplies richer concalls, so keep NSE's other categories.
     const hasConcalls = filings.some((f) => f.category === "CONCALL");
     for (const f of nse.filings) {
@@ -841,6 +881,7 @@ async function buildCompanyFilings(name: string, symbol: string) {
   return {
     symbol: canonical || sym0,
     filings,
+    resultsUrl,
     generatedAt: new Date().toISOString(),
     source: label,
     ok: reached || filings.length > 0,
