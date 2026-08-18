@@ -658,6 +658,10 @@ function parseCompanyFilings(data: unknown): CompanyFiling[] {
 // deck or a quote page.
 function latestResultsDoc(data: unknown): string | undefined {
   if (!Array.isArray(data)) return undefined;
+  // Only a *current-season* results document counts — never a stale one from two
+  // quarters ago. If we can't find this cycle's results, we show nothing rather
+  // than a misleadingly old PDF.
+  const cutoff = Date.now() - 75 * 86_400_000;
   let best: { date: string; url: string } | undefined;
   for (const r of data as Array<Record<string, string>>) {
     const url = (r.attchmntFile ?? "").trim();
@@ -680,6 +684,7 @@ function latestResultsDoc(data: unknown): string | undefined {
     if (!isResults) continue;
     const date = anyDate(r.an_dt) ?? anyDate(r.sort_date ?? "");
     if (!date) continue;
+    if (new Date(`${date}T00:00:00Z`).getTime() < cutoff) continue; // too old to be this cycle's results
     if (!best || date > best.date) best = { date, url };
   }
   return best?.url;
