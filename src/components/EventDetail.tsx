@@ -265,14 +265,20 @@ function ConcallCard({ f, accent, q }: { f: CompanyFiling; accent: string; q?: Q
         </div>
       </div>
       {(() => {
-        // Show the audio recording and the text transcript; drop the slide deck.
-        const links = (f.links ?? []).filter((l) => !/ppt|slide|deck/i.test(l.label));
+        // Text transcript first, then the recording/audio; never the slide deck.
+        const pretty = (l: string) =>
+          /transcript/i.test(l) ? "Text transcript" : /rec|record/i.test(l) ? "Recording" : /audio/i.test(l) ? "Audio" : /notes/i.test(l) ? "Notes" : l;
+        const rank = (l: string) => (/transcript/i.test(l) ? 0 : /rec|record|audio/i.test(l) ? 1 : 2);
+        const links = (f.links ?? [])
+          .filter((l) => !/ppt|slide|deck/i.test(l.label))
+          .slice()
+          .sort((a, b) => rank(a.label) - rank(b.label));
         return (
           <div style={{ display: "flex", gap: 8, marginTop: 11, flexWrap: "wrap", alignItems: "center" }}>
             {links.length ? (
-              links.map((l, i) => <LinkAction key={`${l.url}_${i}`} label={l.label} url={l.url} />)
+              links.map((l, i) => <LinkAction key={`${l.url}_${i}`} label={pretty(l.label)} url={l.url} />)
             ) : (
-              <span style={{ fontSize: 11.5, color: tokens.textHint }}>Audio & text transcript expected within a few days</span>
+              <span style={{ fontSize: 11.5, color: tokens.textHint }}>Audio &amp; text transcript expected within a few days</span>
             )}
           </div>
         );

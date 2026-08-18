@@ -868,24 +868,30 @@ function parseScreenerConcalls(html: string): CompanyFiling[] {
     const iso = screenerMonthISO(label);
     if (!iso) continue;
     const links: FilingLink[] = [];
-    const aRe = /<a\s+href="([^"]+)"[^>]*class="concall-link"[^>]*>\s*([^<]+?)\s*<\/a>/g;
+    // Match every document anchor in the quarter's row — not just class="concall-link".
+    // The TEXT transcript is a plain anchor (title="Raw Transcript", a BSE PDF)
+    // with no such class, so the old regex silently dropped every transcript.
+    const aRe = /<a\s+([^>]*?)href="([^"]+)"([^>]*)>\s*([^<]+?)\s*<\/a>/gi;
     let a: RegExpExecArray | null;
     while ((a = aRe.exec(seg))) {
-      const href = a[1].trim();
-      const lbl = a[2].trim();
-      if (href && lbl) links.push({ label: lbl, url: href, source: hostSource(href) });
+      const attrs = `${a[1]} ${a[3]}`;
+      const href = a[2].trim();
+      let lbl = a[4].trim();
+      if (!href) continue;
+      if (/transcript/i.test(attrs) || /transcript/i.test(lbl)) lbl = "Transcript";
+      else if (!/\b(ppt|rec|notes|recording|audio)\b/i.test(lbl)) continue; // ignore stray anchors
+      links.push({ label: lbl, url: href, source: hostSource(href) });
     }
     if (!links.length) continue;
-    // A genuine earnings call has a transcript or an audio recording. Screener
-    // also lists rows that only carry a PPT or an intimation — those are decks /
-    // notices, not the call itself, so we skip them entirely rather than surface
-    // a presentation under "Earnings Call".
+    // A genuine earnings call has a transcript or an audio recording. Rows that
+    // only carry a PPT are decks, not the call — skip them.
     const call = links.find((l) => /transcript|recording|\brec\b|audio/i.test(l.label));
     if (!call) continue;
-    // Keep only real call materials (never the slide deck) so nothing downstream
-    // can resolve the call to a presentation.
+    // Surface the *text transcript* as the primary link when it exists, and keep
+    // both the transcript and the recording (never the slide deck).
+    const transcript = links.find((l) => /transcript/i.test(l.label));
     const callLinks = links.filter((l) => !/ppt|slide|deck|presentation/i.test(l.label) && !/presentation/i.test(l.url));
-    out.push({ category: "CONCALL", title: `Earnings Call · ${label}`, date: iso, links: callLinks, url: call.url, source: "Screener" });
+    out.push({ category: "CONCALL", title: `Earnings Call · ${label}`, date: iso, links: callLinks, url: (transcript ?? call).url, source: "Screener" });
   }
   return out.slice(0, 12);
 }
